@@ -25,6 +25,16 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 
 Visitor records are protected by row-level security and belong to the company administrator. A company-specific reception QR token routes visitors to a public check-in form. Narrow `SECURITY DEFINER` functions validate that QR token and record the visit without exposing private visitor records. Keep the anon key public and never put a Supabase service-role key in a browser environment variable.
 
+## Cloudflare Workers deployment
+
+This app uses OpenNext to run on Cloudflare Workers. The Worker is named `tgm-check-in`, and its `WORKER_SELF_REFERENCE` service binding targets that same Worker.
+
+1. Run `npx wrangler login` to authenticate with Cloudflare.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the environment used for the build. For local deployment, these can come from `.env.local`; configure them in your CI build environment for automated deployments.
+3. Add the server-only runtime secrets to the Worker with `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`, `npx wrangler secret put RESEND_API_KEY`, and `npx wrangler secret put RESEND_FROM_EMAIL`.
+4. For local Worker previews, put those runtime values in the ignored `.dev.vars` file; deployed Worker secrets are not available to local previews.
+5. Run `npm run preview` to test in the Workers runtime, then `npm run deploy` to build and deploy the Worker.
+
 Add employee names and work email addresses under **Settings → Employee host directory**. The public QR form exposes employee names only, never their email addresses. An administrator approves arrivals from the visitor log; the server-side approval endpoint then emails the selected employee through Resend. If email delivery fails after approval, the administrator can retry it from the visitor row. Demo mode supports the approval flow locally but never sends real email.
 
 Visitors can also select **Check out** on the reception QR page. The portal emails a one-time code to the address on their active visit; the code expires after 10 minutes, allows up to 6 attempts, and checkout codes are limited to 3 requests per visitor every 10 minutes. Apply `20261015120000_add_self_checkout_verification.sql` and configure Supabase plus Resend for this feature. It is intentionally unavailable in browser-only demo mode.

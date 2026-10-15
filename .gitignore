@@ -14,10 +14,13 @@
 
 # production
 /build
+/.open-next/
+/.wrangler/
 
 # misc
 .DS_Store
 *.pem
+.dev.vars*
 
 # debug
 npm-debug.log*
