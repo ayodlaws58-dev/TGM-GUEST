@@ -623,8 +623,37 @@ function SettingsPanel({ configured, companyName, onShowQr, onSaveCompanyName, o
     </section>
     <ReceptionTeam configured={configured} />
     <EmployeeDirectory configured={configured} onHostsChanged={onHostsChanged} />
+    {configured && <Todos />}
     <section className="panel settings-card local-data-card"><div className="settings-heading"><span className="settings-status-icon local"><Icon name="users" size={20} /></span><div><h2>Daily visitor history</h2><p>Visitor log entries keep each office visit separate, including repeat visitors. The overview displays check-ins for today.</p></div></div></section>
   </>;
+}
+
+function Todos() {
+  const [todos, setTodos] = useState<{ id: string | number; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const client = getSupabase();
+    if (!client) {
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    client.from("todos").select().then(({ data, error: queryError }) => {
+      if (!active) return;
+      if (queryError) setError(queryError.message);
+      else setTodos((data ?? []) as { id: string | number; name: string }[]);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  return <section className="panel settings-card directory-card">
+    <div className="settings-heading"><span className="settings-status-icon"><Icon name="check" size={20} /></span><div><h2>Todos</h2><p>Test list loaded from the Supabase todos table.</p></div></div>
+    {error && <p className="form-error directory-error" role="alert">{error}</p>}
+    {loading ? <p className="directory-empty">Loading todos…</p> : !error && todos.length === 0 ? <p className="directory-empty">No todos found.</p> : <ul className="host-list">{todos.map((todo) => <li key={todo.id}><span><strong>{todo.name}</strong></span></li>)}</ul>}
+  </section>;
 }
 
 function ReceptionTeam({ configured }: { configured: boolean }) {
