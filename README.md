@@ -33,7 +33,9 @@ This app uses OpenNext to run on Cloudflare Workers. The Worker is named `tgm-ch
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the environment used for the build. For local deployment, these can come from `.env.local`; configure them in your CI build environment for automated deployments.
 3. Add the server-only runtime secrets to the Worker with `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`, `npx wrangler secret put RESEND_API_KEY`, and `npx wrangler secret put RESEND_FROM_EMAIL`.
 4. For local Worker previews, put those runtime values in the ignored `.dev.vars` file; deployed Worker secrets are not available to local previews.
-5. Run `npm run preview` to test in the Workers runtime, then `npm run deploy` to build and deploy the Worker.
+5. Run `npm run preview` to test in the Workers runtime, then `npm run deploy` to deploy the Worker.
+
+If configuring build and deploy commands separately in Cloudflare, use `npm run build:cloudflare` (equivalent to `npx opennextjs-cloudflare build`) for the build command and `npm run deploy` (equivalent to `npx opennextjs-cloudflare deploy`) for the deploy command. Do not use `npm run build` as the Cloudflare build command; it only runs the underlying Next.js build and does not generate the Worker bundle.
 
 Add employee names and work email addresses under **Settings → Employee host directory**. The public QR form exposes employee names only, never their email addresses. An administrator approves arrivals from the visitor log; the server-side approval endpoint then emails the selected employee through Resend. If email delivery fails after approval, the administrator can retry it from the visitor row. Demo mode supports the approval flow locally but never sends real email.
 
