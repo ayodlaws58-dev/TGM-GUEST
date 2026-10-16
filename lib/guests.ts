@@ -39,7 +39,7 @@ const STORAGE_KEY = "tgm-check-in-visits";
 const WORKSPACE_KEY = "tgm-check-in-workspace";
 const HOSTS_KEY = "tgm-check-in-hosts";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 

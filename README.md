@@ -16,7 +16,7 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 ## Supabase setup
 
 1. Create a Supabase project and copy `.env.example` to `.env.local`.
-2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your project URL and publishable anon key.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to your project URL and publishable key (the legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` name still works).
 3. Apply every migration in `supabase/migrations/` using the Supabase SQL editor or your migration workflow, in filename order.
 4. Enable email/password authentication in Supabase Auth. Company administrators create an account or sign in from the portal.
 5. Set `SUPABASE_SERVICE_ROLE_KEY` in the server environment for reception invitations and private host-email lookup. This secret must never use the `NEXT_PUBLIC_` prefix or be exposed to the browser.
@@ -30,7 +30,7 @@ Visitor records are protected by row-level security and belong to the company ad
 This app uses OpenNext to run on Cloudflare Workers. The Worker is named `tgm-check-in`, and its `WORKER_SELF_REFERENCE` service binding targets that same Worker.
 
 1. Run `npx wrangler login` to authenticate with Cloudflare.
-2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the environment used for the build. For local deployment, these can come from `.env.local`; configure them in your CI build environment for automated deployments.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the environment used for the build. For local deployment, these can come from `.env.local`; configure them in your CI build environment for automated deployments.
 3. Add the server-only runtime secrets to the Worker with `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`, `npx wrangler secret put RESEND_API_KEY`, and `npx wrangler secret put RESEND_FROM_EMAIL`.
 4. For local Worker previews, put those runtime values in the ignored `.dev.vars` file; deployed Worker secrets are not available to local previews.
 5. Run `npm run preview` to test in the Workers runtime, then `npm run deploy` to deploy the Worker.
