@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tgm-check-in",
+  "name": "tgm-guest",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-10-15",
   "compatibility_flags": ["nodejs_compat"],
