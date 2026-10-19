@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     "192.168.56.1",        // your LAN IP
     "*.local-origin.dev",
     "*.tunnel.example.com"
+
   ],
 };
 
