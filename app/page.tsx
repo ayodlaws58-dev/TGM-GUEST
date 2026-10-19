@@ -382,8 +382,10 @@ export default function Home() {
   }
 
   function getReceptionUrl() {
-    return receptionToken ? `${window.location.origin}/check-in/${receptionToken}` : "";
-  }
+  if (!receptionToken) return "";
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+  return `${base}/check-in/${receptionToken}`;
+}
 
   function downloadReceptionQr() {
     const svg = document.querySelector("#reception-qr svg") as SVGSVGElement | null;
