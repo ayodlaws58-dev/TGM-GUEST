@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",
+    "172.22.4.171",
     "192.168.56.1",        // your LAN IP
     "*.local-origin.dev",
     "*.tunnel.example.com"
