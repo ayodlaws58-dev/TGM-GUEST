@@ -47,6 +47,19 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
         listReceptionHosts(receptionToken),
       ]);
       if (!name) throw new Error("This reception QR code is invalid. Please ask the front desk for help.");
+      const savedVisit = window.localStorage.getItem(`tgm-visit:${receptionToken}`);
+      if (savedVisit) {
+        const visit = await getVisitStatus(savedVisit).catch(() => null);
+        if (visit?.status === "checked_in") {
+          router.replace(`/check-in/${encodeURIComponent(receptionToken)}/visit`);
+          return;
+        }
+        if (visit?.status === "pending_approval" && active) {
+          setReceipt({ ...visit, visit_token: savedVisit });
+        } else if (visit) {
+          window.localStorage.removeItem(`tgm-visit:${receptionToken}`);
+        }
+      }
       if (active) {
         setToken(receptionToken);
         setCompanyName(name);
