@@ -60,6 +60,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
 }
 
 const avatarColors = ["rose", "blue", "amber", "violet", "teal", "orange", "pink"];
+const receptionSiteUrl = "https://reception.tgm.net";
 const statusLabels: Record<GuestStatus, string> = {
   pending_approval: "Pending approval",
   checked_in: "On site",
@@ -387,7 +388,7 @@ export default function Home() {
   }
 
   function getReceptionBase() {
-    return (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+    return (process.env.NEXT_PUBLIC_SITE_URL || receptionSiteUrl).replace(/\/$/, "");
   }
 
   // Phones on mobile data can only reach a public HTTPS address, not localhost or a LAN IP.

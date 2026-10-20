@@ -4,7 +4,7 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-10-15",
   "compatibility_flags": ["nodejs_compat"],
-  "routes": [{ "pattern": "reception.tgmeducation.net", "custom_domain": true }],
+  "routes": [{ "pattern": "reception.tgm.net", "custom_domain": true }],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
