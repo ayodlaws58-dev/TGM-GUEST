@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import {
   getReceptionCompanyName,
   getVisitStatus,
-  hasSupabaseConfig,
   listReceptionHosts,
   registerVisitor,
   VISIT_PURPOSES,
@@ -32,13 +31,6 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState<VisitReceipt | null>(null);
-  const [checkoutMode, setCheckoutMode] = useState(false);
-  const [checkoutChallengeId, setCheckoutChallengeId] = useState("");
-  const [checkoutCodeRequested, setCheckoutCodeRequested] = useState(false);
-  const [checkoutComplete, setCheckoutComplete] = useState(false);
-  const [checkoutEmail, setCheckoutEmail] = useState("");
-  const [checkoutNotice, setCheckoutNotice] = useState("");
-
   useEffect(() => {
     let active = true;
     params.then(async ({ token: receptionToken }) => {
@@ -135,101 +127,22 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
     }
   }
 
-  async function handleRequestCheckoutCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    setCheckoutNotice("");
-    if (!hasSupabaseConfig) {
-      setError("Email-verified self-checkout needs a connected company account. Please ask reception for help.");
-      setSaving(false);
-      return;
-    }
-    try {
-      const response = await fetch("/api/self-checkout/request-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reception_token: token, email: checkoutEmail.trim() }),
-      });
-      const result = await response.json() as { challenge_id?: string; message?: string; error?: string };
-      if (!response.ok) throw new Error(result.error || "Unable to request a checkout code.");
-      if (!result.challenge_id) throw new Error("Unable to start checkout verification. Please ask reception for help.");
-      setCheckoutChallengeId(result.challenge_id);
-      setCheckoutCodeRequested(true);
-      setCheckoutNotice(result.message || "If you have an active visit with this email, a checkout code will be sent.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to request a checkout code. Please ask reception for help.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleVerifyCheckoutCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    const code = String(new FormData(event.currentTarget).get("checkout_code") ?? "").trim();
-    try {
-      const response = await fetch("/api/self-checkout/verify-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challenge_id: checkoutChallengeId, code }),
-      });
-      const result = await response.json() as { error?: string; checked_out?: boolean };
-      if (!response.ok) throw new Error(result.error || "Unable to verify your checkout code.");
-      if (!result.checked_out) throw new Error("Your visit could not be checked out. Please ask reception for help.");
-      setCheckoutComplete(true);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to verify your checkout code. Please ask reception for help.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <main className="checkin-screen">
       <div className="checkin-top-brand"><Image className="checkin-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={200} height={63} priority /></div>
       <section className="checkin-card">
-        <div className={`checkin-symbol ${receipt || checkoutComplete ? "success" : ""}`}><span>{receipt || checkoutComplete ? "✓" : "✳"}</span></div>
+        <div className={`checkin-symbol ${receipt ? "success" : ""}`}><span>{receipt ? "✓" : "✳"}</span></div>
         <p className="eyebrow">{loading ? "COMPANY VISITOR CHECK-IN" : companyName.toUpperCase() || "COMPANY VISITOR CHECK-IN"}</p>
         {loading ? (
           <><h1>One moment</h1><p className="checkin-description">We&apos;re opening the visitor check-in form.</p><span className="spinner" /></>
         ) : error && !companyName ? (
           <><h1>Check-in unavailable</h1><p className="checkin-description">{error}</p></>
-        ) : checkoutComplete ? (
-          <><h1>You&apos;re checked out</h1><p className="checkin-description">Your departure has been recorded. Thank you for visiting {companyName}.</p><span className="welcome-badge">✓ &nbsp;Checkout complete</span></>
         ) : receipt ? (
           <><h1>Waiting for reception</h1><p className="checkin-description">Thank you, <strong>{receipt.name}</strong>. Reception will verify your visit and notify <strong>{receipt.host_name}</strong> when you&apos;re approved.</p><span className="welcome-badge">✓ &nbsp;Check-in request received</span></>
-        ) : checkoutMode ? (
-          <>
-            <h1>{checkoutCodeRequested ? "Enter your checkout code" : "Check out of your visit"}</h1>
-            <p className="checkin-description">{checkoutCodeRequested ? `Enter the six-digit code sent to ${checkoutEmail}.` : "Enter the email address you used when you checked in. We’ll email you a one-time verification code."}</p>
-            {!checkoutCodeRequested ? (
-              <form className="guest-form visitor-form" onSubmit={handleRequestCheckoutCode}>
-                <label>Email address<input name="checkout_email" type="email" autoComplete="email" value={checkoutEmail} onChange={(event) => setCheckoutEmail(event.target.value)} placeholder="you@example.com" maxLength={254} required /></label>
-                {error && <p className="form-error" role="alert">{error}</p>}
-                {!hasSupabaseConfig && <p className="form-error">Email-verified self-checkout is unavailable in demo mode. Please ask reception.</p>}
-                <button className="primary-button full-button confirm-checkin" disabled={saving || !hasSupabaseConfig}>{saving ? <><span className="button-spinner" /> Sending code…</> : "Email me a checkout code"}</button>
-              </form>
-            ) : (
-              <form className="guest-form visitor-form" onSubmit={handleVerifyCheckoutCode}>
-                {checkoutNotice && <p className="form-success" role="status">{checkoutNotice}</p>}
-                <label>Six-digit code<input name="checkout_code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} placeholder="000000" required /></label>
-                {error && <p className="form-error" role="alert">{error}</p>}
-                <button className="primary-button full-button confirm-checkin" disabled={saving}>{saving ? <><span className="button-spinner" /> Verifying…</> : "Verify and check out"}</button>
-                <button className="text-button checkout-change-email" type="button" onClick={() => { setCheckoutCodeRequested(false); setCheckoutChallengeId(""); setCheckoutNotice(""); setError(""); }}>Back to email entry</button>
-              </form>
-            )}
-            <button className="text-button checkout-back" type="button" onClick={() => { setCheckoutMode(false); setCheckoutCodeRequested(false); setCheckoutChallengeId(""); setCheckoutNotice(""); setError(""); }}>Back to visitor check-in</button>
-          </>
         ) : (
           <>
             <h1>Welcome to {companyName}</h1>
             <p className="checkin-description">Please share a few details. Reception will verify your arrival and notify your host.</p>
-            <div className="checkin-mode-toggle" role="group" aria-label="Visitor action">
-              <button type="button" className="active" aria-pressed="true">Check in</button>
-              <button type="button" aria-pressed="false" onClick={() => { setCheckoutMode(true); setError(""); }}>Check out</button>
-            </div>
             <form className="guest-form visitor-form" onSubmit={handleSubmit}>
               <label>Full name<input name="full_name" autoComplete="name" placeholder="e.g. Jordan Taylor Lee" maxLength={120} required /></label>
               <label>Email address<input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} required /></label>
