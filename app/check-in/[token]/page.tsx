@@ -3,8 +3,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  getCurrentPoint,
   getReceptionCompanyName,
+  getVisitStatus,
   hasSupabaseConfig,
   listReceptionHosts,
   registerVisitor,
@@ -18,9 +21,11 @@ type VisitReceipt = {
   host_name: string;
   status: GuestStatus;
   checked_in_at: string | null;
+  visit_token: string;
 };
 
 export default function CheckInPage({ params }: { params: Promise<{ token: string }> }) {
+  const router = useRouter();
   const [token, setToken] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [hosts, setHosts] = useState<string[]>([]);
@@ -56,20 +61,41 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
     return () => { active = false; };
   }, [params]);
 
+  const visitToken = receipt?.visit_token;
+  useEffect(() => {
+    if (!token || !visitToken) return;
+    window.localStorage.setItem(`tgm-visit:${token}`, visitToken);
+    let active = true;
+    const poll = async () => {
+      try {
+        const visit = await getVisitStatus(visitToken);
+        if (active && visit?.status === "checked_in") router.replace(`/check-in/${encodeURIComponent(token)}/visit`);
+      } catch {
+        // Keep waiting; the next poll will retry.
+      }
+    };
+    void poll();
+    const timer = window.setInterval(poll, 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [token, visitToken, router]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
-    const first_name = String(form.get("first_name") ?? "").trim();
-    const middle_name = String(form.get("middle_name") ?? "").trim();
-    const last_name = String(form.get("last_name") ?? "").trim();
+    // Split into the existing first/middle/last columns.
+    const full_name = String(form.get("full_name") ?? "").trim().replace(/\s+/g, " ");
+    const nameParts = full_name ? full_name.split(" ") : [];
+    const first_name = nameParts[0] ?? "";
+    const last_name = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const middle_name = nameParts.slice(1, -1).join(" ");
     const email = String(form.get("email") ?? "").trim();
     const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
     if (!first_name || !last_name || !email || !phone || !host_name || !purpose) {
-      setError("Complete all required fields to check in.");
+      setError("Enter your full name (first and last) and complete all required fields to check in.");
       setSaving(false);
       return;
     }
@@ -108,10 +134,11 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
       return;
     }
     try {
+      const point = await getCurrentPoint();
       const response = await fetch("/api/self-checkout/request-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reception_token: token, email: checkoutEmail.trim() }),
+        body: JSON.stringify({ reception_token: token, email: checkoutEmail.trim(), latitude: point?.latitude, longitude: point?.longitude }),
       });
       const result = await response.json() as { challenge_id?: string; message?: string; error?: string };
       if (!response.ok) throw new Error(result.error || "Unable to request a checkout code.");
@@ -193,9 +220,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
               <button type="button" aria-pressed="false" onClick={() => { setCheckoutMode(true); setError(""); }}>Check out</button>
             </div>
             <form className="guest-form visitor-form" onSubmit={handleSubmit}>
-              <label>First name<input name="first_name" autoComplete="given-name" placeholder="e.g. Jordan" maxLength={120} required /></label>
-              <label>Middle name <span className="optional-label">Optional</span><input name="middle_name" autoComplete="additional-name" placeholder="e.g. Taylor" maxLength={120} /></label>
-              <label>Last name<input name="last_name" autoComplete="family-name" placeholder="e.g. Lee" maxLength={120} required /></label>
+              <label>Full name<input name="full_name" autoComplete="name" placeholder="e.g. Jordan Taylor Lee" maxLength={120} required /></label>
               <label>Email address<input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} required /></label>
               <label>Phone number<input name="phone" type="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" maxLength={32} required /></label>
               <label>Company <span className="optional-label">Optional</span><input name="company" autoComplete="organization" placeholder="e.g. Acme Inc." maxLength={120} /></label>

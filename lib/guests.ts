@@ -265,13 +265,57 @@ export async function updateCompanyName(name: string): Promise<void> {
   window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify({ ...workspace, company_name: name }));
 }
 
+export type GeoPoint = { latitude: number; longitude: number };
+
+// Best effort: the server enforces the geofence, so a missing location is passed as null.
+export function getCurrentPoint(): Promise<GeoPoint | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    );
+  });
+}
+
+export type Geofence = { lat: number | null; lng: number | null; radius_m: number };
+
+export async function getGeofence(): Promise<Geofence> {
+  const client = getSupabase();
+  if (!client) return { lat: null, lng: null, radius_m: 30 };
+  const { data, error } = await client
+    .from("workspaces")
+    .select("geofence_lat, geofence_lng, geofence_radius_m")
+    .limit(1)
+    .single();
+  if (error) throw error;
+  return { lat: data.geofence_lat, lng: data.geofence_lng, radius_m: data.geofence_radius_m };
+}
+
+export async function saveGeofence(point: GeoPoint | null): Promise<void> {
+  const client = getSupabase();
+  if (!client) throw new Error("The geofence needs a connected company account.");
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!userData.user) throw new Error("Sign in to update the geofence.");
+  const { error } = await client
+    .from("workspaces")
+    .update({ geofence_lat: point?.latitude ?? null, geofence_lng: point?.longitude ?? null })
+    .eq("owner_id", userData.user.id);
+  if (error) throw error;
+}
+
 export async function registerVisitor(
   receptionToken: string,
   input: NewGuest,
-): Promise<Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> | null> {
+): Promise<(Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> & { visit_token: string }) | null> {
   const client = getSupabase();
   if (client) {
+    const point = await getCurrentPoint();
     const { data, error } = await client.rpc("register_visitor_by_qr", {
+      visitor_lat: point?.latitude ?? null,
+      visitor_lng: point?.longitude ?? null,
       reception_token: receptionToken,
       visitor_first_name: input.first_name,
       visitor_middle_name: input.middle_name || null,
@@ -283,7 +327,7 @@ export async function registerVisitor(
       visit_purpose: input.purpose,
     });
     if (error) throw error;
-    return (data?.[0] as Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> | undefined) ?? null;
+    return (data?.[0] as (Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> & { visit_token: string }) | undefined) ?? null;
   }
 
   const workspace = await getReceptionWorkspace();
@@ -315,7 +359,48 @@ export async function registerVisitor(
     host_name: guest.host_name,
     status: guest.status,
     checked_in_at: guest.checked_in_at,
+    visit_token: guest.id,
   };
+}
+
+export type VisitStatus = Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at" | "checked_out_at"> & { company_name: string };
+
+export async function getVisitStatus(visitToken: string): Promise<VisitStatus | null> {
+  const client = getSupabase();
+  if (client) {
+    const { data, error } = await client.rpc("get_visit_status", { visit_token: visitToken });
+    if (error) throw error;
+    return (data?.[0] as VisitStatus | undefined) ?? null;
+  }
+  const guest = loadLocalGuests().find((item) => item.id === visitToken);
+  if (!guest) return null;
+  return {
+    name: guest.name,
+    company: guest.company,
+    host_name: guest.host_name,
+    status: guest.status,
+    checked_in_at: guest.checked_in_at,
+    checked_out_at: guest.checked_out_at,
+    company_name: (await getReceptionWorkspace()).company_name,
+  };
+}
+
+export async function checkoutVisit(visitToken: string): Promise<boolean> {
+  const client = getSupabase();
+  if (client) {
+    const point = await getCurrentPoint();
+    const { data, error } = await client.rpc("checkout_visit", {
+      visit_token: visitToken,
+      user_lat: point?.latitude ?? null,
+      user_lng: point?.longitude ?? null,
+    });
+    if (error) throw error;
+    return data === true;
+  }
+  const guest = loadLocalGuests().find((item) => item.id === visitToken);
+  if (!guest || guest.status !== "checked_in") return false;
+  await setGuestStatus(visitToken, "checked_out");
+  return true;
 }
 
 function loadLocalHosts(): EmployeeHost[] {

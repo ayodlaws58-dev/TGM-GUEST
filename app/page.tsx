@@ -8,6 +8,8 @@ import {
   addEmployeeHost,
   addGuest,
   approveDemoGuest,
+  getCurrentPoint,
+  getGeofence,
   getReceptionWorkspace,
   getSupabase,
   hasSupabaseConfig,
@@ -18,10 +20,12 @@ import {
   removeEmployeeHost,
   removeReceptionMember,
   inviteReceptionMember,
+  saveGeofence,
   setGuestStatus,
   updateCompanyName,
   VISIT_PURPOSES,
   type EmployeeHost,
+  type Geofence,
   type Guest,
   type GuestStatus,
   type VisitorReportPeriod,
@@ -386,10 +390,20 @@ export default function Home() {
     setCompanyName(name);
   }
 
+  function getReceptionBase() {
+    return (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+  }
+
+  // Phones on mobile data can only reach a public HTTPS address, not localhost or a LAN IP.
+  function isPrivateHost(base: string) {
+    const host = new URL(base).hostname;
+    return base.startsWith("http://") || host === "localhost" || host.endsWith(".local")
+      || /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+  }
+
   function getReceptionUrl() {
     if (!receptionToken) return "";
-    const base = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
-    return `${base}/check-in/${receptionToken}`;
+    return `${getReceptionBase()}/check-in/${receptionToken}`;
   }
 
   function downloadReceptionQr() {
@@ -526,7 +540,7 @@ export default function Home() {
 
       {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="full_name" placeholder="e.g. Jordan Taylor Lee" autoComplete="name" required maxLength={240} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
 
-      {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p><button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
+      {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p>{receptionToken && isPrivateHost(getReceptionBase()) && <p className="form-error" role="alert">This code points to {getReceptionBase()}, which only works on this network. To work on Wi-Fi and mobile data, open the dashboard from your public https:// site address (or set NEXT_PUBLIC_SITE_URL) and download the code again.</p>}<button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
     </div>
   );
 }
@@ -628,11 +642,52 @@ function SettingsPanel({ configured, companyName, onShowQr, onSaveCompanyName, o
       <div className="settings-divider" />
       <div className="connection-instructions"><h3>Reception QR code</h3><p>Visitors submit their details and select a host. They remain pending until an administrator approves them; approval checks them in and sends an email to the host.</p><button className="primary-button settings-qr-button" onClick={onShowQr}><Icon name="qr" size={16} /> Show reception QR code</button></div>
     </section>
+    <GeofenceSettings configured={configured} />
     <ReceptionTeam configured={configured} />
     <EmployeeDirectory configured={configured} onHostsChanged={onHostsChanged} />
     {configured && <Todos />}
     <section className="panel settings-card local-data-card"><div className="settings-heading"><span className="settings-status-icon local"><Icon name="users" size={20} /></span><div><h2>Daily visitor history</h2><p>Visitor log entries keep each office visit separate, including repeat visitors. The overview displays check-ins for today.</p></div></div></section>
   </>;
+}
+
+function GeofenceSettings({ configured }: { configured: boolean }) {
+  const [fence, setFence] = useState<Geofence | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!configured) return;
+    getGeofence().then(setFence).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to load the geofence."));
+  }, [configured]);
+
+  async function update(useCurrent: boolean) {
+    setSaving(true);
+    setError("");
+    try {
+      const point = useCurrent ? await getCurrentPoint() : null;
+      if (useCurrent && !point) throw new Error("Unable to read your location. Allow location access in the browser and try again.");
+      await saveGeofence(point);
+      setFence(await getGeofence());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to update the geofence.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!configured) return null;
+  const isSet = fence?.lat != null && fence?.lng != null;
+  return (
+    <section className="panel settings-card">
+      <div className="connection-instructions">
+        <h3>Office geofence ({fence?.radius_m ?? 30} m)</h3>
+        <p>{isSet ? `Visitors must be within ${fence?.radius_m} meters of the saved office location (${fence?.lat?.toFixed(5)}, ${fence?.lng?.toFixed(5)}) to check in or check out.` : "Not set. Stand at the office entrance and save your location to require visitors to be on site."}</p>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button className="primary-button settings-qr-button" disabled={saving} onClick={() => update(true)}>{saving ? "Saving…" : isSet ? "Update to my current location" : "Use my current location"}</button>
+        {isSet && <button className="secondary-button" disabled={saving} onClick={() => update(false)}>Turn off geofence</button>}
+      </div>
+    </section>
+  );
 }
 
 function Todos() {

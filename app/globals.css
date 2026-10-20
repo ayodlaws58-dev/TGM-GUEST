@@ -308,6 +308,13 @@ tbody tr:last-child td { border-bottom: 0; }
 .checkout-back { margin-top: 13px; }
 .checkin-card .welcome-badge { padding: 8px 11px; border-radius: 20px; background: var(--navy-soft); color: var(--navy); font-size: 10px; font-weight: 600; }
 .checkin-footer { margin: 20px 0 0; color: #92949d; text-align: center; font-size: 9px; }
+.checkin-card { position: relative; }
+.visit-bell { position: absolute; top: 14px; right: 14px; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: #fff; font-size: 16px; cursor: pointer; }
+.visit-bell.on { background: var(--navy-soft); border-color: var(--navy); }
+.visit-bell:disabled { cursor: default; opacity: .7; }
+.visit-stopwatch { margin: 18px 0 22px; font-family: Manrope, sans-serif; font-size: 44px; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; color: var(--navy); }
+.visit-reminder { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--navy-soft); font-size: 11px; text-align: left; }
+.visit-reminder img { height: auto; flex: none; }
 .checkin-footer strong { color: #676a74; font-weight: 600; }
 .checkin-home-link { position: absolute; bottom: 17px; color: #a2a4ac; font-size: 8px; }
 .directory-card { padding-bottom: 16px; }
