@@ -60,7 +60,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
 }
 
 const avatarColors = ["rose", "blue", "amber", "violet", "teal", "orange", "pink"];
-const receptionSiteUrl = "https://reception.tgm.net";
+const receptionSiteUrl = "https://reception.tgmeducation.net";
 const statusLabels: Record<GuestStatus, string> = {
   pending_approval: "Pending approval",
   checked_in: "On site",

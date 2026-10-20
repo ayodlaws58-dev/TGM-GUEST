@@ -21,14 +21,14 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 4. Enable email/password authentication in Supabase Auth. Company administrators create an account or sign in from the portal.
 5. Set `SUPABASE_SERVICE_ROLE_KEY` in the server environment for reception invitations and private host-email lookup. This secret must never use the `NEXT_PUBLIC_` prefix or be exposed to the browser.
 6. Create a Resend account, verify a sender domain/address, and set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the server environment. Do not prefix these values with `NEXT_PUBLIC_`.
-7. Set `NEXT_PUBLIC_SITE_URL` to `https://reception.tgm.net` so downloaded reception QR codes use the public check-in domain. For local testing, override it with your local address, such as `http://localhost:3000`.
+7. Set `NEXT_PUBLIC_SITE_URL` to `https://reception.tgmeducation.net` so downloaded reception QR codes use the public check-in domain. For local testing, override it with your local address, such as `http://localhost:3000`.
 8. Restart the development server after changing environment variables.
 
 Visitor records are protected by row-level security and belong to the company administrator. A company-specific reception QR token routes visitors to a public check-in form. Narrow `SECURITY DEFINER` functions validate that QR token and record the visit without exposing private visitor records. Keep the anon key public and never put a Supabase service-role key in a browser environment variable.
 
 ## Cloudflare Workers deployment
 
-This app uses OpenNext to run on Cloudflare Workers. The Worker is named `tgm-check-in`, and its `WORKER_SELF_REFERENCE` service binding targets that same Worker. The reception QR domain `reception.tgm.net` is configured as the Worker custom domain.
+This app uses OpenNext to run on Cloudflare Workers. The Worker is named `tgm-check-in`, and its `WORKER_SELF_REFERENCE` service binding targets that same Worker. The reception QR domain `reception.tgmeducation.net` is configured as the Worker custom domain.
 
 1. Run `npx wrangler login` to authenticate with Cloudflare.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the environment used for the build. For local deployment, these can come from `.env.local`; configure them in your CI build environment for automated deployments.
