@@ -17,9 +17,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email-verified self-checkout is not configured. Please ask reception for help." }, { status: 503 });
   }
 
-  let input: { reception_token?: unknown; email?: unknown; latitude?: unknown; longitude?: unknown };
+  let input: { reception_token?: unknown; email?: unknown };
   try {
-    input = await request.json() as { reception_token?: unknown; email?: unknown; latitude?: unknown; longitude?: unknown };
+    input = await request.json() as { reception_token?: unknown; email?: unknown };
   } catch {
     return NextResponse.json({ error: "Enter the email address used for your visitor check-in." }, { status: 400 });
   }
@@ -43,18 +43,6 @@ export async function POST(request: Request) {
   const serverClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
-  const { data: insideFence, error: fenceError } = await serverClient.rpc("is_within_reception_geofence", {
-    reception_token: receptionToken,
-    user_lat: typeof input.latitude === "number" ? input.latitude : null,
-    user_lng: typeof input.longitude === "number" ? input.longitude : null,
-  });
-  if (fenceError) {
-    console.error("Unable to check the geofence:", fenceError.message);
-    return NextResponse.json({ error: "Unable to request a checkout code right now. Please ask reception for help." }, { status: 503 });
-  }
-  if (insideFence !== true) {
-    return NextResponse.json({ error: "Allow location access and be at the office to check out, or ask reception for help." }, { status: 403 });
-  }
   const { data, error } = await serverClient.rpc("create_self_checkout_challenge", {
     reception_token: receptionToken,
     visitor_email: email,

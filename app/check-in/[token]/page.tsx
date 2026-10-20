@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  getCurrentPoint,
   getReceptionCompanyName,
   getVisitStatus,
   hasSupabaseConfig,
@@ -134,11 +133,10 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
       return;
     }
     try {
-      const point = await getCurrentPoint();
       const response = await fetch("/api/self-checkout/request-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reception_token: token, email: checkoutEmail.trim(), latitude: point?.latitude, longitude: point?.longitude }),
+        body: JSON.stringify({ reception_token: token, email: checkoutEmail.trim() }),
       });
       const result = await response.json() as { challenge_id?: string; message?: string; error?: string };
       if (!response.ok) throw new Error(result.error || "Unable to request a checkout code.");

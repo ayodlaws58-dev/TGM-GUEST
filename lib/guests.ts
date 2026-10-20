@@ -265,57 +265,13 @@ export async function updateCompanyName(name: string): Promise<void> {
   window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify({ ...workspace, company_name: name }));
 }
 
-export type GeoPoint = { latitude: number; longitude: number };
-
-// Best effort: the server enforces the geofence, so a missing location is passed as null.
-export function getCurrentPoint(): Promise<GeoPoint | null> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    );
-  });
-}
-
-export type Geofence = { lat: number | null; lng: number | null; radius_m: number };
-
-export async function getGeofence(): Promise<Geofence> {
-  const client = getSupabase();
-  if (!client) return { lat: null, lng: null, radius_m: 30 };
-  const { data, error } = await client
-    .from("workspaces")
-    .select("geofence_lat, geofence_lng, geofence_radius_m")
-    .limit(1)
-    .single();
-  if (error) throw error;
-  return { lat: data.geofence_lat, lng: data.geofence_lng, radius_m: data.geofence_radius_m };
-}
-
-export async function saveGeofence(point: GeoPoint | null): Promise<void> {
-  const client = getSupabase();
-  if (!client) throw new Error("The geofence needs a connected company account.");
-  const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) throw new Error("Sign in to update the geofence.");
-  const { error } = await client
-    .from("workspaces")
-    .update({ geofence_lat: point?.latitude ?? null, geofence_lng: point?.longitude ?? null })
-    .eq("owner_id", userData.user.id);
-  if (error) throw error;
-}
-
 export async function registerVisitor(
   receptionToken: string,
   input: NewGuest,
 ): Promise<(Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> & { visit_token: string }) | null> {
   const client = getSupabase();
   if (client) {
-    const point = await getCurrentPoint();
     const { data, error } = await client.rpc("register_visitor_by_qr", {
-      visitor_lat: point?.latitude ?? null,
-      visitor_lng: point?.longitude ?? null,
       reception_token: receptionToken,
       visitor_first_name: input.first_name,
       visitor_middle_name: input.middle_name || null,
@@ -388,12 +344,7 @@ export async function getVisitStatus(visitToken: string): Promise<VisitStatus | 
 export async function checkoutVisit(visitToken: string): Promise<boolean> {
   const client = getSupabase();
   if (client) {
-    const point = await getCurrentPoint();
-    const { data, error } = await client.rpc("checkout_visit", {
-      visit_token: visitToken,
-      user_lat: point?.latitude ?? null,
-      user_lng: point?.longitude ?? null,
-    });
+    const { data, error } = await client.rpc("checkout_visit", { visit_token: visitToken });
     if (error) throw error;
     return data === true;
   }

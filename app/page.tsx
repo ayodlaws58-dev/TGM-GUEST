@@ -8,8 +8,6 @@ import {
   addEmployeeHost,
   addGuest,
   approveDemoGuest,
-  getCurrentPoint,
-  getGeofence,
   getReceptionWorkspace,
   getSupabase,
   hasSupabaseConfig,
@@ -20,12 +18,10 @@ import {
   removeEmployeeHost,
   removeReceptionMember,
   inviteReceptionMember,
-  saveGeofence,
   setGuestStatus,
   updateCompanyName,
   VISIT_PURPOSES,
   type EmployeeHost,
-  type Geofence,
   type Guest,
   type GuestStatus,
   type VisitorReportPeriod,
@@ -75,7 +71,7 @@ function initials(name: string) {
 }
 
 function formatTime(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "â€”";
   return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
@@ -417,7 +413,7 @@ export default function Home() {
     window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 
-  if (!authReady) return <main className="loading-screen"><span className="spinner" />Connecting to your workspace…</main>;
+  if (!authReady) return <main className="loading-screen"><span className="spinner" />Connecting to your workspaceâ€¦</main>;
 
   if (hasSupabaseConfig && !session) {
     return (
@@ -443,7 +439,7 @@ export default function Home() {
   }
 
   if (hasSupabaseConfig && session && !accessReady) {
-    return <main className="loading-screen"><span className="spinner" />Loading your reception access…</main>;
+    return <main className="loading-screen"><span className="spinner" />Loading your reception accessâ€¦</main>;
   }
 
   if (hasSupabaseConfig && session && accessError) {
@@ -454,7 +450,7 @@ export default function Home() {
     <div className="app-shell">
       <aside className="sidebar">
         <a href="#" className="brand" aria-label="TGM Check-in home"><Image className="brand-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={190} height={60} priority /></a>
-        <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || "Your company"}</strong><small>Visitor workspace</small></span><span className="chevron">⌄</span></div>
+        <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || "Your company"}</strong><small>Visitor workspace</small></span><span className="chevron">âŒ„</span></div>
         <p className="nav-label">WORKSPACE</p>
         <nav className="main-nav" aria-label="Main navigation">
           <button className={`nav-item ${page === "Overview" ? "active" : ""}`} onClick={() => setPage("Overview")}><Icon name="grid" />Overview</button>
@@ -463,7 +459,7 @@ export default function Home() {
           {accessRole === "admin" && <button className={`nav-item ${page === "Settings" ? "active" : ""}`} onClick={() => setPage("Settings")}><Icon name="settings" />Settings</button>}
         </nav>
         <div className="sidebar-bottom">
-          <div className="help-card"><div className="help-spark">✳</div><strong>Need a hand?</strong><p>We&apos;re here to make welcoming visitors a breeze.</p><a href="mailto:hello@tgmcheckin.com">Get in touch <Icon name="arrow" size={14} /></a></div>
+          <div className="help-card"><div className="help-spark">âœ³</div><strong>Need a hand?</strong><p>We&apos;re here to make welcoming visitors a breeze.</p><a href="mailto:hello@tgmcheckin.com">Get in touch <Icon name="arrow" size={14} /></a></div>
           <div className="profile"><div className="profile-avatar">{initials(session?.user.email?.split("@")[0] || "Office admin")}</div><span><strong>{session?.user.email ?? "Office admin"}</strong><small>{hasSupabaseConfig ? accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
         </div>
       </aside>
@@ -475,7 +471,7 @@ export default function Home() {
           {notice && <div className="success-banner" role="status"><span>{notice}</span><button className="text-button" onClick={() => setNotice("")}>Dismiss</button></div>}
 
           {page === "Overview" && <>
-            <section className="page-heading"><div><p className="eyebrow">RECEPTION OVERVIEW</p><h1>Good morning <span className="wave">✳</span></h1><p className="heading-subtitle">Here&apos;s who&apos;s visiting {companyName || "your office"} today.</p></div><button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></section>
+            <section className="page-heading"><div><p className="eyebrow">RECEPTION OVERVIEW</p><h1>Good morning <span className="wave">âœ³</span></h1><p className="heading-subtitle">Here&apos;s who&apos;s visiting {companyName || "your office"} today.</p></div><button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></section>
             {!hasSupabaseConfig && <div className="demo-note"><span className="demo-note-icon">i</span><span>Demo mode: visitor check-ins are saved in this browser.</span><button onClick={() => setPage("Settings")}>Connect Supabase <Icon name="arrow" size={13} /></button></div>}
             {stats.pending > 0 && <button className="pending-banner" onClick={() => { setPage("Visitors"); setFilter("pending_approval"); }}><span>{stats.pending} visitor{stats.pending === 1 ? "" : "s"} waiting for approval</span><span>Review arrivals <Icon name="arrow" size={14} /></span></button>}
             <section className="reception-banner"><div className="reception-icon"><Icon name="qr" size={22} /></div><div className="reception-info"><span className="event-kicker">YOUR FRONT DESK CHECK-IN</span><h2>One QR for every visitor</h2><p>Display this code at reception. Visitors submit their details for admin approval.</p></div><button className="reception-cta" onClick={() => setShowQr(true)}>Show QR code <Icon name="arrow" size={14} /></button><div className="banner-decoration banner-decoration-one" /><div className="banner-decoration banner-decoration-two" /></section>
@@ -520,11 +516,11 @@ export default function Home() {
               <div className="table-scroll"><table>
                 <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th></tr></thead>
                 <tbody>
-                  {reportLoading ? <tr><td colSpan={6} className="table-message"><span className="spinner" />Loading saved visitor records…</td></tr>
+                  {reportLoading ? <tr><td colSpan={6} className="table-message"><span className="spinner" />Loading saved visitor recordsâ€¦</td></tr>
                     : purposeFilteredReportGuests.length === 0 ? <tr><td colSpan={6} className="table-message">No visitors found for this purpose during this period.</td></tr>
                       : purposeFilteredReportGuests.map((guest, index) => <tr key={guest.id}>
                         <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
-                        <td>{guest.purpose}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td>
+                        <td>{guest.purpose}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "â€”"}</td>
                         <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span></td><td className="arrival-cell">{formatTime(guest.checked_in_at)}</td>
                       </tr>)}
                 </tbody>
@@ -538,7 +534,7 @@ export default function Home() {
         </div>
       </main>
 
-      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="full_name" placeholder="e.g. Jordan Taylor Lee" autoComplete="name" required maxLength={240} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
+      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="full_name" placeholder="e.g. Jordan Taylor Lee" autoComplete="name" required maxLength={240} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submittingâ€¦</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
 
       {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p>{receptionToken && isPrivateHost(getReceptionBase()) && <p className="form-error" role="alert">This code points to {getReceptionBase()}, which only works on this network. To work on Wi-Fi and mobile data, open the dashboard from your public https:// site address (or set NEXT_PUBLIC_SITE_URL) and download the code again.</p>}<button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
     </div>
@@ -588,22 +584,22 @@ function GuestTable({
       <div className="table-scroll"><table>
         <thead><tr><th>VISITOR</th><th>STATUS</th><th>ARRIVAL</th><th>VISITING</th><th>COMPANY</th><th>PURPOSE</th><th aria-label="Actions" /></tr></thead>
         <tbody>
-          {loading ? <tr><td colSpan={7} className="table-message"><span className="spinner" />Loading today&apos;s visitors…</td></tr>
+          {loading ? <tr><td colSpan={7} className="table-message"><span className="spinner" />Loading today&apos;s visitorsâ€¦</td></tr>
             : guests.length === 0 ? <tr><td colSpan={7} className="table-message"><div className="empty-state"><span className="empty-icon"><Icon name="users" size={21} /></span><strong>No visitors found</strong><span>Try another search or add a visitor to today&apos;s log.</span><button className="primary-button" onClick={onAdd}><Icon name="plus" size={16} /> Add visitor</button></div></td></tr>
               : guests.map((guest, index) => <tr key={guest.id}>
                 <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
                 <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span>{guest.status === "checked_in" && guest.host_notified_at && <small className="notification-sent">Host notified</small>}</td>
-                <td className="arrival-cell">{formatTime(guest.checked_in_at)}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td><td className="company-cell" title={guest.purpose}>{guest.purpose}</td>
+                <td className="arrival-cell">{formatTime(guest.checked_in_at)}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "â€”"}</td><td className="company-cell" title={guest.purpose}>{guest.purpose}</td>
                 <td><div className="row-actions">
-                  {guest.status === "pending_approval" && <button className="approve-action" disabled={approvingId === guest.id} onClick={() => onApprove(guest)}>{approvingId === guest.id ? "Sending…" : "Approve & notify"}</button>}
-                  {guest.status === "checked_in" && canNotifyHost && !guest.host_notified_at && guest.host_id && <button className="approve-action" disabled={approvingId === guest.id} onClick={() => onApprove(guest)}>{approvingId === guest.id ? "Sending…" : "Retry email"}</button>}
+                  {guest.status === "pending_approval" && <button className="approve-action" disabled={approvingId === guest.id} onClick={() => onApprove(guest)}>{approvingId === guest.id ? "Sendingâ€¦" : "Approve & notify"}</button>}
+                  {guest.status === "checked_in" && canNotifyHost && !guest.host_notified_at && guest.host_id && <button className="approve-action" disabled={approvingId === guest.id} onClick={() => onApprove(guest)}>{approvingId === guest.id ? "Sendingâ€¦" : "Retry email"}</button>}
                   {guest.status === "checked_in" && <button className="checkin-action" onClick={() => onStatus(guest)}>Check out</button>}
                   {guest.status === "checked_out" && <button className="checkin-action" onClick={() => onStatus(guest)}>Check in</button>}
                 </div></td>
               </tr>)}
         </tbody>
       </table></div>
-      <div className="table-footer"><span>Showing <strong>{guests.length}</strong> visitor{guests.length === 1 ? "" : "s"}</span><span>Today · {formatToday()}</span></div>
+      <div className="table-footer"><span>Showing <strong>{guests.length}</strong> visitor{guests.length === 1 ? "" : "s"}</span><span>Today Â· {formatToday()}</span></div>
     </section>
   );
 }
@@ -638,56 +634,15 @@ function SettingsPanel({ configured, companyName, onShowQr, onSaveCompanyName, o
     <section className="panel settings-card">
       <div className="settings-heading"><span className={`settings-status-icon ${configured ? "connected" : ""}`}><Icon name={configured ? "check" : "grid"} size={20} /></span><div><h2>{companyName || "Your company"}</h2><p>{configured ? "Company visitor records sync securely to your Supabase workspace." : "Demo visitor check-ins are saved locally in this browser."}</p></div><span className={`connection-pill ${configured ? "connected" : ""}`}><i />{configured ? "Connected" : "Local demo"}</span></div>
       <div className="settings-divider" />
-      <form className="company-name-form guest-form" onSubmit={handleCompanySave}><label>Company name<input value={companyInput} onChange={(event) => setCompanyInput(event.target.value)} maxLength={120} required /></label>{saveError && <p className="form-error" role="alert">{saveError}</p>}<button className="secondary-button" type="submit" disabled={saving || companyInput.trim() === companyName}>{saving ? "Saving…" : "Save company name"}</button></form>
+      <form className="company-name-form guest-form" onSubmit={handleCompanySave}><label>Company name<input value={companyInput} onChange={(event) => setCompanyInput(event.target.value)} maxLength={120} required /></label>{saveError && <p className="form-error" role="alert">{saveError}</p>}<button className="secondary-button" type="submit" disabled={saving || companyInput.trim() === companyName}>{saving ? "Savingâ€¦" : "Save company name"}</button></form>
       <div className="settings-divider" />
       <div className="connection-instructions"><h3>Reception QR code</h3><p>Visitors submit their details and select a host. They remain pending until an administrator approves them; approval checks them in and sends an email to the host.</p><button className="primary-button settings-qr-button" onClick={onShowQr}><Icon name="qr" size={16} /> Show reception QR code</button></div>
     </section>
-    <GeofenceSettings configured={configured} />
     <ReceptionTeam configured={configured} />
     <EmployeeDirectory configured={configured} onHostsChanged={onHostsChanged} />
     {configured && <Todos />}
     <section className="panel settings-card local-data-card"><div className="settings-heading"><span className="settings-status-icon local"><Icon name="users" size={20} /></span><div><h2>Daily visitor history</h2><p>Visitor log entries keep each office visit separate, including repeat visitors. The overview displays check-ins for today.</p></div></div></section>
   </>;
-}
-
-function GeofenceSettings({ configured }: { configured: boolean }) {
-  const [fence, setFence] = useState<Geofence | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!configured) return;
-    getGeofence().then(setFence).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to load the geofence."));
-  }, [configured]);
-
-  async function update(useCurrent: boolean) {
-    setSaving(true);
-    setError("");
-    try {
-      const point = useCurrent ? await getCurrentPoint() : null;
-      if (useCurrent && !point) throw new Error("Unable to read your location. Allow location access in the browser and try again.");
-      await saveGeofence(point);
-      setFence(await getGeofence());
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to update the geofence.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (!configured) return null;
-  const isSet = fence?.lat != null && fence?.lng != null;
-  return (
-    <section className="panel settings-card">
-      <div className="connection-instructions">
-        <h3>Office geofence ({fence?.radius_m ?? 30} m)</h3>
-        <p>{isSet ? `Visitors must be within ${fence?.radius_m} meters of the saved office location (${fence?.lat?.toFixed(5)}, ${fence?.lng?.toFixed(5)}) to check in or check out.` : "Not set. Stand at the office entrance and save your location to require visitors to be on site."}</p>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button settings-qr-button" disabled={saving} onClick={() => update(true)}>{saving ? "Saving…" : isSet ? "Update to my current location" : "Use my current location"}</button>
-        {isSet && <button className="secondary-button" disabled={saving} onClick={() => update(false)}>Turn off geofence</button>}
-      </div>
-    </section>
-  );
 }
 
 function Todos() {
@@ -714,7 +669,7 @@ function Todos() {
   return <section className="panel settings-card directory-card">
     <div className="settings-heading"><span className="settings-status-icon"><Icon name="check" size={20} /></span><div><h2>Todos</h2><p>Test list loaded from the Supabase todos table.</p></div></div>
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
-    {loading ? <p className="directory-empty">Loading todos…</p> : !error && todos.length === 0 ? <p className="directory-empty">No todos found.</p> : <ul className="host-list">{todos.map((todo) => <li key={todo.id}><span><strong>{todo.name}</strong></span></li>)}</ul>}
+    {loading ? <p className="directory-empty">Loading todosâ€¦</p> : !error && todos.length === 0 ? <p className="directory-empty">No todos found.</p> : <ul className="host-list">{todos.map((todo) => <li key={todo.id}><span><strong>{todo.name}</strong></span></li>)}</ul>}
   </section>;
 }
 
@@ -773,11 +728,11 @@ function ReceptionTeam({ configured }: { configured: boolean }) {
       ? <p className="directory-demo-note">Connect Supabase to invite reception staff. Each team member signs in with their own account.</p>
       : <form className="directory-form team-invite-form guest-form" onSubmit={invite}>
         <label className="team-email-label">Team member email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="reception@company.com" maxLength={254} required /></label>
-        <button className="primary-button" type="submit" disabled={saving}>{saving ? "Sending invite…" : "Invite reception staff"}</button>
+        <button className="primary-button" type="submit" disabled={saving}>{saving ? "Sending inviteâ€¦" : "Invite reception staff"}</button>
       </form>}
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
     {notice && <p className="form-success directory-error" role="status">{notice}</p>}
-    {configured && (loading ? <p className="directory-empty">Loading reception team…</p> : members.length === 0 ? <p className="directory-empty">No reception team members invited yet.</p> : <ul className="host-list">{members.map((member) => <li key={member.user_id}><span><strong>{member.email}</strong><small>Reception staff</small></span><button className="text-button" type="button" onClick={() => void remove(member.user_id)}>Remove access</button></li>)}</ul>)}
+    {configured && (loading ? <p className="directory-empty">Loading reception teamâ€¦</p> : members.length === 0 ? <p className="directory-empty">No reception team members invited yet.</p> : <ul className="host-list">{members.map((member) => <li key={member.user_id}><span><strong>{member.email}</strong><small>Reception staff</small></span><button className="text-button" type="button" onClick={() => void remove(member.user_id)}>Remove access</button></li>)}</ul>)}
   </section>;
 }
 
@@ -836,9 +791,9 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
     <form className="directory-form guest-form" onSubmit={addHost}>
       <label>Employee name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Jordan Lee" maxLength={120} required /></label>
       <label>Work email<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="jordan@company.com" maxLength={254} required /></label>
-      <button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add employee"}</button>
+      <button className="primary-button" type="submit" disabled={saving}>{saving ? "Addingâ€¦" : "Add employee"}</button>
     </form>
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
-    {loading ? <p className="directory-empty">Loading employee directory…</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <ul className="host-list">{hosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
+    {loading ? <p className="directory-empty">Loading employee directoryâ€¦</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <ul className="host-list">{hosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
   </section>;
 }
