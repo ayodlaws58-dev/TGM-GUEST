@@ -300,15 +300,20 @@ export default function Home() {
     setFormError("");
     setSaving(true);
     const form = new FormData(event.currentTarget);
-    const first_name = String(form.get("first_name") ?? "").trim();
-    const middle_name = String(form.get("middle_name") ?? "").trim();
-    const last_name = String(form.get("last_name") ?? "").trim();
+    // The form now collects a single full name. It is split here so the
+    // existing first/middle/last columns keep working until the database
+    // is changed to store a full name directly.
+    const full_name = String(form.get("full_name") ?? "").trim().replace(/\s+/g, " ");
+    const nameParts = full_name ? full_name.split(" ") : [];
+    const first_name = nameParts[0] ?? "";
+    const last_name = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const middle_name = nameParts.slice(1, -1).join(" ");
     const email = String(form.get("email") ?? "").trim();
     const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
     if (!first_name || !last_name || !email || !phone || !host_name || !purpose) {
-      setFormError("Enter the visitor's details, host, and visit purpose.");
+      setFormError("Enter the visitor's first and last name, details, host, and visit purpose.");
       setSaving(false);
       return;
     }
@@ -382,10 +387,10 @@ export default function Home() {
   }
 
   function getReceptionUrl() {
-  if (!receptionToken) return "";
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
-  return `${base}/check-in/${receptionToken}`;
-}
+    if (!receptionToken) return "";
+    const base = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+    return `${base}/check-in/${receptionToken}`;
+  }
 
   function downloadReceptionQr() {
     const svg = document.querySelector("#reception-qr svg") as SVGSVGElement | null;
@@ -519,7 +524,7 @@ export default function Home() {
         </div>
       </main>
 
-      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>First name<input name="first_name" placeholder="e.g. Jordan" autoComplete="given-name" required maxLength={120} /></label><label>Middle name <span className="optional-label">Optional</span><input name="middle_name" placeholder="e.g. Taylor" autoComplete="additional-name" maxLength={120} /></label><label>Last name<input name="last_name" placeholder="e.g. Lee" autoComplete="family-name" required maxLength={120} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
+      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="full_name" placeholder="e.g. Jordan Taylor Lee" autoComplete="name" required maxLength={240} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
 
       {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p><button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
     </div>
