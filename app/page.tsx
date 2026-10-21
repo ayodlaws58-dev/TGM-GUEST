@@ -108,6 +108,7 @@ export default function Home() {
   const [accessReady, setAccessReady] = useState(!hasSupabaseConfig);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authFullName, setAuthFullName] = useState("");
+  const [authCompanyName, setAuthCompanyName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authNotice, setAuthNotice] = useState("");
@@ -318,8 +319,13 @@ export default function Home() {
     setAuthError("");
     setAuthNotice("");
     const fullName = authFullName.trim().replace(/\s+/g, " ");
+    const signupCompanyName = authCompanyName.trim().replace(/\s+/g, " ");
     if (authMode === "signup" && !fullName) {
       setAuthError("Enter your full name to create an account.");
+      return;
+    }
+    if (authMode === "signup" && !signupCompanyName) {
+      setAuthError("Enter your company name to create an account.");
       return;
     }
     const client = getSupabase();
@@ -334,7 +340,7 @@ export default function Home() {
           email: authEmail,
           password: authPassword,
           options: {
-            data: { full_name: fullName },
+            data: { full_name: fullName, company_name: signupCompanyName },
             emailRedirectTo: `${window.location.origin}/?email_verified=1`,
           },
         })
@@ -484,7 +490,7 @@ export default function Home() {
             <Image className="auth-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={220} height={69} priority />
             <p className="eyebrow">EMAIL VERIFICATION</p>
             <h1>Check your email</h1>
-            <p className="auth-copy">Thanks, {authFullName.trim().replace(/\s+/g, " ")}. We sent a verification link to <strong>{authEmail}</strong>. Verify your email to continue; this page will return you to sign in.</p>
+            <p className="auth-copy">Thanks, {authFullName.trim().replace(/\s+/g, " ")}. We sent a verification link to <strong>{authEmail}</strong> for <strong>{authCompanyName.trim().replace(/\s+/g, " ")}</strong>. Verify your email to continue; this page will return you to sign in.</p>
             <button className="primary-button full-button" onClick={() => {
               setVerificationPending(false);
               setAuthMode("signin");
@@ -504,6 +510,7 @@ export default function Home() {
           <p className="auth-copy">{authMode === "signin" ? "Sign in with your company admin or invited reception team account." : "Create a company administrator account. Reception staff should use their email invitation to set a password."}</p>
           <form className="guest-form" onSubmit={handleAuth}>
             {authMode === "signup" && <label>Full name<input type="text" value={authFullName} onChange={(event) => setAuthFullName(event.target.value)} placeholder="e.g. Jordan Taylor" autoComplete="name" maxLength={120} required /></label>}
+            {authMode === "signup" && <label>Company name<input type="text" value={authCompanyName} onChange={(event) => setAuthCompanyName(event.target.value)} placeholder="e.g. TGM Marchnata" autoComplete="organization" maxLength={120} required /></label>}
             <label>Email address<input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required /></label>
             <label>Password<input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={authMode === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
             {authError && <p className="form-error" role="alert">{authError}</p>}

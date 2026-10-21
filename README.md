@@ -27,7 +27,7 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 
 Visitor records are protected by row-level security and belong to the company administrator. A company-specific reception QR token routes visitors to a public check-in form. Narrow `SECURITY DEFINER` functions validate that QR token and record the visit without exposing private visitor records. Keep the anon key public and never put a Supabase service-role key in a browser environment variable.
 
-Company signup collects a full name in Supabase Auth user metadata for display in the reception profile. With email confirmations enabled, signup displays a check-your-email screen; confirming the link returns to the sign-in form.
+Company signup collects the account holder's full name and company name. The full name is saved in Supabase Auth user metadata for the reception profile, and the company name initializes the workspace when the account first signs in. With email confirmations enabled, signup displays a check-your-email screen; confirming the link returns to the sign-in form. Apply all migrations in `supabase/migrations/` before deploying.
 
 ## Cloudflare Workers deployment
 
