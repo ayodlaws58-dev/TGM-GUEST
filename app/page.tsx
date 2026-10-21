@@ -87,6 +87,13 @@ function formatToday() {
   return new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date());
 }
 
+function timeGreeting(date: Date) {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 function formatReportRange(period: VisitorReportPeriod) {
   const today = new Date();
   if (period === "daily") return formatToday();
@@ -102,6 +109,7 @@ function formatReportRange(period: VisitorReportPeriod) {
 
 export default function Home() {
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [greeting, setGreeting] = useState("Good morning");
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
@@ -139,6 +147,13 @@ export default function Home() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const updateGreeting = () => setGreeting(timeGreeting(new Date()));
+    updateGreeting();
+    const interval = window.setInterval(updateGreeting, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!hasSupabaseConfig) return;
@@ -626,7 +641,7 @@ export default function Home() {
           {notice && <div className="success-banner" role="status"><span>{notice}</span><button className="text-button" onClick={() => setNotice("")}>Dismiss</button></div>}
 
           {page === "Overview" && <>
-            <section className="page-heading"><div><p className="eyebrow">RECEPTION OVERVIEW</p><h1>Good morning</h1><p className="heading-subtitle">Here&apos;s who&apos;s visiting {companyName || "your office"} today.</p></div><button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></section>
+            <section className="page-heading"><div><p className="eyebrow">RECEPTION OVERVIEW</p><h1>{greeting}</h1><p className="heading-subtitle">Here&apos;s who&apos;s visiting {companyName || "your office"} today.</p></div><button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></section>
             {!hasSupabaseConfig && <div className="demo-note"><span className="demo-note-icon">i</span><span>Demo mode: visitor check-ins are saved in this browser.</span><button onClick={() => setPage("Settings")}>Connect Supabase <Icon name="arrow" size={13} /></button></div>}
             {stats.pending > 0 && <button className="pending-banner" onClick={() => { setPage("Visitors"); setFilter("pending_approval"); }}><span>{stats.pending} visitor{stats.pending === 1 ? "" : "s"} waiting for approval</span><span>Review arrivals <Icon name="arrow" size={14} /></span></button>}
             <section className="reception-banner"><div className="reception-icon"><Icon name="qr" size={22} /></div><div className="reception-info"><span className="event-kicker">YOUR FRONT DESK CHECK-IN</span><h2>One QR for every visitor</h2><p>Display this code at reception. Visitors submit their details for admin approval.</p></div><button className="reception-cta" onClick={() => setShowQr(true)}>Show QR code <Icon name="arrow" size={14} /></button><div className="banner-decoration banner-decoration-one" /><div className="banner-decoration banner-decoration-two" /></section>
