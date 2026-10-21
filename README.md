@@ -21,6 +21,7 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 4. Enable email/password authentication in Supabase Auth. Company administrators create an account or sign in from the portal.
 5. Set `SUPABASE_SERVICE_ROLE_KEY` in the server environment for reception invitations and private host-email lookup. This secret must never use the `NEXT_PUBLIC_` prefix or be exposed to the browser.
 6. Create a Resend account, verify a sender domain/address, and set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the server environment. Do not prefix these values with `NEXT_PUBLIC_`.
+6a. Forgot password: in Supabase Auth → URL Configuration, add `https://reception.tgmeducation.net/**` (and `http://localhost:3000/**`) to Redirect URLs. Supabase's built-in email sender is heavily rate-limited, so configure custom SMTP (for example Resend SMTP) under Auth → SMTP Settings so confirmation and reset emails are delivered.
 7. Set `NEXT_PUBLIC_SITE_URL` to `https://reception.tgmeducation.net` so downloaded reception QR codes use the public check-in domain. For local testing, override it with your local address, such as `http://localhost:3000`.
 8. In Supabase Auth → URL Configuration, allow the dashboard origin used for signup to redirect back after email confirmation (for example, `https://your-dashboard-domain/**` and `http://localhost:3000/**` for local testing).
 9. Restart the development server after changing environment variables.

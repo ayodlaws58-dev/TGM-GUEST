@@ -106,7 +106,9 @@ export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [accessReady, setAccessReady] = useState(!hasSupabaseConfig);
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const [recovering, setRecovering] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
   const [authFullName, setAuthFullName] = useState("");
   const [authCompanyName, setAuthCompanyName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
@@ -147,9 +149,15 @@ export default function Home() {
     void (async () => {
       try {
         const verificationRedirect = new URLSearchParams(window.location.search).get("email_verified") === "1";
+        const passwordResetRedirect = new URLSearchParams(window.location.search).get("password_reset") === "1";
         const { data, error: sessionError } = await client.auth.getSession();
         if (sessionError) throw sessionError;
         let nextSession = data.session;
+        if (passwordResetRedirect) {
+          if (nextSession) setRecovering(true);
+          else setAuthError("This password reset link is invalid or has expired. Request a new one.");
+          window.history.replaceState(null, "", window.location.pathname);
+        }
         if (verificationRedirect) {
           if (nextSession?.user.email_confirmed_at) {
             const { error: signOutError } = await client.auth.signOut({ scope: "local" });
@@ -168,6 +176,8 @@ export default function Home() {
         subscription = client.auth.onAuthStateChange((event, updatedSession) => {
           setSession(updatedSession);
           setAuthError("");
+          if (event === "PASSWORD_RECOVERY") setRecovering(true);
+          if (event === "SIGNED_OUT") setRecovering(false);
           if (event === "SIGNED_IN") setAuthNotice("");
           if (event === "SIGNED_IN") {
             setAccessReady(false);
@@ -334,6 +344,20 @@ export default function Home() {
       return;
     }
     setAuthSaving(true);
+    if (authMode === "forgot") {
+      try {
+        const { error: resetError } = await client.auth.resetPasswordForEmail(authEmail.trim(), {
+          redirectTo: `${window.location.origin}/?password_reset=1`,
+        });
+        if (resetError) setAuthError(resetError.message);
+        else setAuthNotice("If an account exists for that email, a password reset link is on its way.");
+      } catch (cause) {
+        setAuthError(cause instanceof Error ? cause.message : "Unable to send the reset email. Please try again.");
+      } finally {
+        setAuthSaving(false);
+      }
+      return;
+    }
     try {
       const result = authMode === "signup"
         ? await client.auth.signUp({
@@ -350,6 +374,32 @@ export default function Home() {
       else setSession(result.data.session);
     } catch (cause) {
       setAuthError(cause instanceof Error ? cause.message : "Unable to authenticate. Please try again.");
+    } finally {
+      setAuthSaving(false);
+    }
+  }
+
+  async function handleSetNewPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError("");
+    const client = getSupabase();
+    if (!client) return;
+    setAuthSaving(true);
+    try {
+      const { error: updateError } = await client.auth.updateUser({ password: newPassword });
+      if (updateError) {
+        setAuthError(updateError.message);
+        return;
+      }
+      await client.auth.signOut({ scope: "local" });
+      setNewPassword("");
+      setRecovering(false);
+      setSession(null);
+      setAuthMode("signin");
+      setAuthPassword("");
+      setAuthNotice("Your password has been updated. Please sign in.");
+    } catch (cause) {
+      setAuthError(cause instanceof Error ? cause.message : "Unable to update your password. Please try again.");
     } finally {
       setAuthSaving(false);
     }
@@ -482,6 +532,23 @@ export default function Home() {
 
   if (!authReady) return <main className="loading-screen"><span className="spinner" />Connecting to your workspace…</main>;
 
+  if (hasSupabaseConfig && recovering && session) {
+    return (
+      <main className="auth-screen">
+        <div className="auth-card">
+          <Image className="auth-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={220} height={69} priority />
+          <p className="eyebrow">PASSWORD RESET</p>
+          <h1>Set a new password</h1>
+          <form className="guest-form" onSubmit={handleSetNewPassword}>
+            <label>New password<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 6 characters" autoComplete="new-password" minLength={6} required /></label>
+            {authError && <p className="form-error" role="alert">{authError}</p>}
+            <button className="primary-button full-button" type="submit" disabled={authSaving}>{authSaving ? <><span className="button-spinner" /> Please wait…</> : "Update password"}</button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
   if (hasSupabaseConfig && !session) {
     if (verificationPending) {
       return (
@@ -506,19 +573,20 @@ export default function Home() {
         <div className="auth-card">
           <Image className="auth-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={220} height={69} priority />
           <p className="eyebrow">TGM CHECK-IN</p>
-          <h1>{authMode === "signin" ? "Welcome back" : "Set up your company"}</h1>
-          <p className="auth-copy">{authMode === "signin" ? "Sign in with your company admin or invited reception team account." : "Create a company administrator account. Reception staff should use their email invitation to set a password."}</p>
+          <h1>{authMode === "signin" ? "Welcome back" : authMode === "forgot" ? "Reset your password" : "Set up your company"}</h1>
+          <p className="auth-copy">{authMode === "forgot" ? "Enter your email and we'll send you a link to choose a new password." : authMode === "signin" ? "Sign in with your company admin or invited reception team account." : "Create a company administrator account. Reception staff should use their email invitation to set a password."}</p>
           <form className="guest-form" onSubmit={handleAuth}>
             {authMode === "signup" && <label>Full name<input type="text" value={authFullName} onChange={(event) => setAuthFullName(event.target.value)} placeholder="e.g. Jordan Taylor" autoComplete="name" maxLength={120} required /></label>}
             {authMode === "signup" && <label>Company name<input type="text" value={authCompanyName} onChange={(event) => setAuthCompanyName(event.target.value)} placeholder="e.g. TGM Marchnata" autoComplete="organization" maxLength={120} required /></label>}
             <label>Email address<input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required /></label>
-            <label>Password<input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={authMode === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
+            {authMode !== "forgot" && <label>Password<input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={authMode === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>}
+            {authMode === "signin" && <button type="button" className="text-button auth-toggle" onClick={() => { setAuthMode("forgot"); setAuthError(""); setAuthNotice(""); }}>Forgot password?</button>}
             {authError && <p className="form-error" role="alert">{authError}</p>}
             {authNotice && <p className="form-success" role="status">{authNotice}</p>}
-            <button className="primary-button full-button" type="submit" disabled={authSaving}>{authSaving ? <><span className="button-spinner" /> Please wait…</> : authMode === "signin" ? "Sign in" : "Create account"}</button>
+            <button className="primary-button full-button" type="submit" disabled={authSaving}>{authSaving ? <><span className="button-spinner" /> Please wait…</> : authMode === "signin" ? "Sign in" : authMode === "forgot" ? "Send reset link" : "Create account"}</button>
           </form>
-          <button className="text-button auth-toggle" onClick={() => { setAuthMode(authMode === "signin" ? "signup" : "signin"); setAuthError(""); setAuthNotice(""); }}>
-            {authMode === "signin" ? "New to TGM? Set up your company" : "Already have an account? Sign in"}
+          <button className="text-button auth-toggle" onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAuthError(""); setAuthNotice(""); }}>
+            {authMode === "signin" ? "New to TGM? Set up your company" : authMode === "forgot" ? "Back to sign in" : "Already have an account? Sign in"}
           </button>
         </div>
       </main>
