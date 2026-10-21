@@ -71,6 +71,13 @@ function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
+function accountDisplayName(session: Session | null) {
+  const fullName = session?.user.user_metadata.full_name;
+  return typeof fullName === "string" && fullName.trim()
+    ? fullName.trim()
+    : session?.user.email ?? "Office admin";
+}
+
 function formatTime(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
@@ -100,10 +107,13 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [accessReady, setAccessReady] = useState(!hasSupabaseConfig);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authFullName, setAuthFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authSaving, setAuthSaving] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [realtimeError, setRealtimeError] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -131,22 +141,50 @@ export default function Home() {
     if (!hasSupabaseConfig) return;
     const client = getSupabase();
     if (!client) return;
-    client.auth.getSession().then(({ data, error: sessionError }) => {
-      if (sessionError) setAuthError(sessionError.message);
-      setSession(data.session);
-      setAuthReady(true);
-    });
-    const { data: { subscription } } = client.auth.onAuthStateChange((event, nextSession) => {
-      setSession(nextSession);
-      setAuthError("");
-      setAuthNotice("");
-      if (event === "SIGNED_IN") {
-        setAccessReady(false);
-        setAccessError("");
-        setWorkspaceOwnerId("");
+    let active = true;
+    let subscription: ReturnType<typeof client.auth.onAuthStateChange>["data"]["subscription"] | undefined;
+    void (async () => {
+      try {
+        const verificationRedirect = new URLSearchParams(window.location.search).get("email_verified") === "1";
+        const { data, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        let nextSession = data.session;
+        if (verificationRedirect) {
+          if (nextSession?.user.email_confirmed_at) {
+            const { error: signOutError } = await client.auth.signOut({ scope: "local" });
+            if (signOutError) throw signOutError;
+            nextSession = null;
+            setAuthMode("signin");
+            setAuthNotice("Your email is verified. Please sign in.");
+          } else {
+            setAuthNotice("Email verification could not be completed. Please sign in or request a new confirmation email.");
+          }
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+        if (!active) return;
+        setSession(nextSession);
+        setAuthReady(true);
+        subscription = client.auth.onAuthStateChange((event, updatedSession) => {
+          setSession(updatedSession);
+          setAuthError("");
+          if (event === "SIGNED_IN") setAuthNotice("");
+          if (event === "SIGNED_IN") {
+            setAccessReady(false);
+            setAccessError("");
+            setWorkspaceOwnerId("");
+          }
+        }).data.subscription;
+      } catch (cause) {
+        if (active) {
+          setAuthError(cause instanceof Error ? cause.message : "Unable to check your sign-in status.");
+          setAuthReady(true);
+        }
       }
-    });
-    return () => subscription.unsubscribe();
+    })();
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const refreshGuests = useCallback(async () => {
@@ -279,14 +317,36 @@ export default function Home() {
     event.preventDefault();
     setAuthError("");
     setAuthNotice("");
+    const fullName = authFullName.trim().replace(/\s+/g, " ");
+    if (authMode === "signup" && !fullName) {
+      setAuthError("Enter your full name to create an account.");
+      return;
+    }
     const client = getSupabase();
-    if (!client) return;
-    const result = authMode === "signup"
-      ? await client.auth.signUp({ email: authEmail, password: authPassword })
-      : await client.auth.signInWithPassword({ email: authEmail, password: authPassword });
-    if (result.error) setAuthError(result.error.message);
-    else if (authMode === "signup" && !result.data.session) setAuthNotice("Check your inbox to confirm your email, then sign in.");
-    else setSession(result.data.session);
+    if (!client) {
+      setAuthError("Authentication is unavailable. Check your Supabase configuration and try again.");
+      return;
+    }
+    setAuthSaving(true);
+    try {
+      const result = authMode === "signup"
+        ? await client.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: {
+            data: { full_name: fullName },
+            emailRedirectTo: `${window.location.origin}/?email_verified=1`,
+          },
+        })
+        : await client.auth.signInWithPassword({ email: authEmail, password: authPassword });
+      if (result.error) setAuthError(result.error.message);
+      else if (authMode === "signup" && !result.data.session) setVerificationPending(true);
+      else setSession(result.data.session);
+    } catch (cause) {
+      setAuthError(cause instanceof Error ? cause.message : "Unable to authenticate. Please try again.");
+    } finally {
+      setAuthSaving(false);
+    }
   }
 
   async function handleSignOut() {
@@ -417,6 +477,24 @@ export default function Home() {
   if (!authReady) return <main className="loading-screen"><span className="spinner" />Connecting to your workspace…</main>;
 
   if (hasSupabaseConfig && !session) {
+    if (verificationPending) {
+      return (
+        <main className="auth-screen">
+          <section className="auth-card">
+            <Image className="auth-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={220} height={69} priority />
+            <p className="eyebrow">EMAIL VERIFICATION</p>
+            <h1>Check your email</h1>
+            <p className="auth-copy">Thanks, {authFullName.trim().replace(/\s+/g, " ")}. We sent a verification link to <strong>{authEmail}</strong>. Verify your email to continue; this page will return you to sign in.</p>
+            <button className="primary-button full-button" onClick={() => {
+              setVerificationPending(false);
+              setAuthMode("signin");
+              setAuthNotice("After verifying your email, sign in to continue.");
+              setAuthError("");
+            }}>Return to sign in</button>
+          </section>
+        </main>
+      );
+    }
     return (
       <main className="auth-screen">
         <div className="auth-card">
@@ -425,11 +503,12 @@ export default function Home() {
           <h1>{authMode === "signin" ? "Welcome back" : "Set up your company"}</h1>
           <p className="auth-copy">{authMode === "signin" ? "Sign in with your company admin or invited reception team account." : "Create a company administrator account. Reception staff should use their email invitation to set a password."}</p>
           <form className="guest-form" onSubmit={handleAuth}>
+            {authMode === "signup" && <label>Full name<input type="text" value={authFullName} onChange={(event) => setAuthFullName(event.target.value)} placeholder="e.g. Jordan Taylor" autoComplete="name" maxLength={120} required /></label>}
             <label>Email address<input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required /></label>
             <label>Password<input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={authMode === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
-            {authError && <p className="form-error">{authError}</p>}
-            {authNotice && <p className="form-success">{authNotice}</p>}
-            <button className="primary-button full-button" type="submit">{authMode === "signin" ? "Sign in" : "Create account"}</button>
+            {authError && <p className="form-error" role="alert">{authError}</p>}
+            {authNotice && <p className="form-success" role="status">{authNotice}</p>}
+            <button className="primary-button full-button" type="submit" disabled={authSaving}>{authSaving ? <><span className="button-spinner" /> Please wait…</> : authMode === "signin" ? "Sign in" : "Create account"}</button>
           </form>
           <button className="text-button auth-toggle" onClick={() => { setAuthMode(authMode === "signin" ? "signup" : "signin"); setAuthError(""); setAuthNotice(""); }}>
             {authMode === "signin" ? "New to TGM? Set up your company" : "Already have an account? Sign in"}
@@ -461,7 +540,7 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <div className="help-card"><strong>Need a hand?</strong><p>We&apos;re here to make welcoming visitors a breeze.</p><a href="mailto:hello@tgmcheckin.com">Get in touch <Icon name="arrow" size={14} /></a></div>
-          <div className="profile"><div className="profile-avatar">{initials(session?.user.email?.split("@")[0] || "Office admin")}</div><span><strong>{session?.user.email ?? "Office admin"}</strong><small>{hasSupabaseConfig ? accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
+          <div className="profile"><div className="profile-avatar">{initials(accountDisplayName(session))}</div><span><strong>{accountDisplayName(session)}</strong><small>{hasSupabaseConfig ? accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
         </div>
       </aside>
 
