@@ -147,6 +147,7 @@ export default function Home() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [sendingSummary, setSendingSummary] = useState(false);
 
   useEffect(() => {
     const updateGreeting = () => setGreeting(timeGreeting(new Date()));
@@ -513,6 +514,30 @@ export default function Home() {
     }
   }
 
+  async function sendSummary() {
+    setError("");
+    setNotice("");
+    setSendingSummary(true);
+    try {
+      const client = getSupabase();
+      if (!client) throw new Error("Unable to connect to the workspace.");
+      const { data, error: sessionError } = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!data.session) throw new Error("Sign in again to send the summary.");
+      const response = await fetch("/api/daily-summary/send", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + data.session.access_token },
+      });
+      const result = await response.json() as { error?: string; to?: string };
+      if (!response.ok) throw new Error(result.error || "Unable to send the summary.");
+      setNotice(`Today's visitor summary was sent to ${result.to}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to send the summary.");
+    } finally {
+      setSendingSummary(false);
+    }
+  }
+
   async function saveCompanyName(name: string) {
     await updateCompanyName(name);
     setCompanyName(name);
@@ -641,7 +666,7 @@ export default function Home() {
           {notice && <div className="success-banner" role="status"><span>{notice}</span><button className="text-button" onClick={() => setNotice("")}>Dismiss</button></div>}
 
           {page === "Overview" && <>
-            <section className="page-heading"><div><p className="eyebrow">RECEPTION OVERVIEW</p><h1>{greeting}</h1><p className="heading-subtitle">Here&apos;s who&apos;s visiting {companyName || "your office"} today.</p></div><button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></section>
+            <section className="page-heading"><div><p className="eyebrow">RECEPTION OVERVIEW</p><h1>{greeting}</h1><p className="heading-subtitle">Here&apos;s who&apos;s visiting {companyName || "your office"} today.</p>            </div><div className="heading-actions">{hasSupabaseConfig && accessRole === "admin" && <button className="secondary-button" onClick={sendSummary} disabled={sendingSummary}>{sendingSummary ? "Sending…" : "Email today's summary"}</button>}<button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></div></section>
             {!hasSupabaseConfig && <div className="demo-note"><span className="demo-note-icon">i</span><span>Demo mode: visitor check-ins are saved in this browser.</span><button onClick={() => setPage("Settings")}>Connect Supabase <Icon name="arrow" size={13} /></button></div>}
             {stats.pending > 0 && <button className="pending-banner" onClick={() => { setPage("Visitors"); setFilter("pending_approval"); }}><span>{stats.pending} visitor{stats.pending === 1 ? "" : "s"} waiting for approval</span><span>Review arrivals <Icon name="arrow" size={14} /></span></button>}
             <section className="reception-banner"><div className="reception-icon"><Icon name="qr" size={22} /></div><div className="reception-info"><span className="event-kicker">YOUR FRONT DESK CHECK-IN</span><h2>One QR for every visitor</h2><p>Display this code at reception. Visitors submit their details for admin approval.</p></div><button className="reception-cta" onClick={() => setShowQr(true)}>Show QR code <Icon name="arrow" size={14} /></button><div className="banner-decoration banner-decoration-one" /><div className="banner-decoration banner-decoration-two" /></section>
