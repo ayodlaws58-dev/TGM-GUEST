@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type GuestStatus = "pending_approval" | "checked_in" | "checked_out";
+export type CheckoutMethod = "self" | "assisted";
 export type VisitorReportPeriod = "daily" | "weekly" | "monthly";
 
 export const VISIT_PURPOSES = ["Meeting", "Interview", "Delivery", "Client visit", "Vendor visit", "Other"] as const;
@@ -17,6 +18,7 @@ export type Guest = {
   status: GuestStatus;
   checked_in_at: string | null;
   checked_out_at: string | null;
+  checkout_method?: CheckoutMethod | null;
   host_notified_at: string | null;
   created_at: string;
 };
@@ -115,6 +117,7 @@ const demoGuests: Guest[] = [
     status: "checked_out",
     checked_in_at: minutesAgo(46),
     checked_out_at: minutesAgo(35),
+    checkout_method: "self",
     host_notified_at: null,
     created_at: minutesAgo(46),
   },
@@ -130,6 +133,7 @@ const demoGuests: Guest[] = [
     status: "checked_out",
     checked_in_at: minutesAgo(34),
     checked_out_at: minutesAgo(21),
+    checkout_method: "assisted",
     host_notified_at: null,
     created_at: minutesAgo(34),
   },
@@ -181,7 +185,7 @@ export async function listGuests(period: VisitorReportPeriod = "daily"): Promise
 
   const { data, error } = await client
     .from("guests")
-    .select("id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, host_notified_at, created_at")
+    .select("id, name, email, phone, company, host_name, host_id, purpose, status,     checked_in_at, checked_out_at, checkout_method, host_notified_at, created_at")
     .gte("created_at", start)
     .lt("created_at", end)
     .order("created_at", { ascending: false });
@@ -195,7 +199,7 @@ export async function addGuest(input: NewGuest, receptionToken: string): Promise
   if (!registered) throw new Error("Unable to add visitor: the reception QR code is invalid.");
 }
 
-export async function setGuestStatus(id: string, status: GuestStatus): Promise<void> {
+export async function setGuestStatus(id: string, status: GuestStatus, demoCheckoutMethod: CheckoutMethod = "assisted"): Promise<void> {
   const checked_in_at = status === "checked_in" ? new Date().toISOString() : undefined;
   const checked_out_at = status === "checked_out" ? new Date().toISOString() : null;
   const client = getSupabase();
@@ -210,7 +214,7 @@ export async function setGuestStatus(id: string, status: GuestStatus): Promise<v
 
   const guests = loadLocalGuests().map((guest) =>
     guest.id === id
-      ? { ...guest, status, checked_in_at: checked_in_at ?? guest.checked_in_at, checked_out_at }
+      ? { ...guest, status, checked_in_at: checked_in_at ?? guest.checked_in_at, checked_out_at, checkout_method: status === "checked_out" ? demoCheckoutMethod : null }
       : guest,
   );
   saveLocalGuests(guests);
@@ -350,7 +354,7 @@ export async function checkoutVisit(visitToken: string): Promise<boolean> {
   }
   const guest = loadLocalGuests().find((item) => item.id === visitToken);
   if (!guest || guest.status !== "checked_in") return false;
-  await setGuestStatus(visitToken, "checked_out");
+  await setGuestStatus(visitToken, "checked_out", "self");
   return true;
 }
 
@@ -409,6 +413,57 @@ export async function addEmployeeHost(name: string, email: string): Promise<Empl
   const host = { id: crypto.randomUUID(), name, email, created_at: new Date().toISOString() };
   window.localStorage.setItem(HOSTS_KEY, JSON.stringify([...hosts, host]));
   return host;
+}
+
+export type BulkHostResult = { added: number; skipped: number; errors: string[] };
+
+const HOST_EMAIL_PATTERN = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+
+// Accepts one employee per line as "Name, email" or "Name<TAB>email" (pasted from a spreadsheet or CSV).
+export function parseEmployeeList(text: string): { rows: { name: string; email: string }[]; errors: string[] } {
+  const rows: { name: string; email: string }[] = [];
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  text.split(/\r?\n/).forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line) return;
+    const parts = line.split(/\t|,|;/).map((part) => part.trim().replace(/^"|"$/g, "").trim());
+    const [name = "", email = ""] = parts;
+    if (index === 0 && /^name$/i.test(name) && /^e-?mail/i.test(email)) return;
+    if (parts.length < 2 || !name || name.length > 120) {
+      errors.push(`Line ${index + 1}: expected "Full name, email".`);
+    } else if (email.length > 254 || !HOST_EMAIL_PATTERN.test(email)) {
+      errors.push(`Line ${index + 1}: "${email}" is not a valid email address.`);
+    } else if (seen.has(name.toLowerCase())) {
+      errors.push(`Line ${index + 1}: ${name} appears more than once.`);
+    } else {
+      seen.add(name.toLowerCase());
+      rows.push({ name, email });
+    }
+  });
+  return { rows, errors };
+}
+
+export async function addEmployeeHostsBulk(text: string): Promise<BulkHostResult> {
+  const { rows, errors } = parseEmployeeList(text);
+  if (rows.length === 0) return { added: 0, skipped: 0, errors: errors.length ? errors : ["Paste at least one employee."] };
+  const existing = new Set((await listEmployeeHosts()).map((host) => host.name.toLowerCase()));
+  const fresh = rows.filter((row) => !existing.has(row.name.toLowerCase()));
+  const skipped = rows.length - fresh.length;
+  const client = getSupabase();
+  if (client) {
+    if (fresh.length > 0) {
+      const { error } = await client.from("employee_hosts").insert(fresh);
+      if (error) throw error;
+    }
+  } else {
+    const now = new Date().toISOString();
+    window.localStorage.setItem(
+      HOSTS_KEY,
+      JSON.stringify([...loadLocalHosts(), ...fresh.map((row) => ({ id: crypto.randomUUID(), ...row, created_at: now }))]),
+    );
+  }
+  return { added: fresh.length, skipped, errors };
 }
 
 export async function removeEmployeeHost(id: string): Promise<void> {

@@ -14,6 +14,7 @@ type SummaryGuest = {
   status: string;
   checked_in_at: string | null;
   checked_out_at: string | null;
+  checkout_method: string | null;
 };
 
 const watFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -34,10 +35,11 @@ function csvCell(value: string | null) {
 }
 
 function buildCsv(guests: SummaryGuest[]) {
-  const header = ["Name", "Email", "Phone", "Company", "Host", "Purpose", "Status", "Checked in", "Checked out"];
+  const header = ["Name", "Email", "Phone", "Company", "Host", "Purpose", "Status", "Checked in", "Checked out", "Check-out method"];
   const rows = guests.map((guest) => [
     guest.name, guest.email, guest.phone, guest.company, guest.host_name, guest.purpose,
     guest.status.replace("_", " "), formatWat(guest.checked_in_at), formatWat(guest.checked_out_at),
+    guest.status === "checked_out" ? (guest.checkout_method === "self" ? "Self" : "Assisted") : "",
   ].map(csvCell).join(","));
   return [header.map(csvCell).join(","), ...rows].join("\r\n");
 }
@@ -60,7 +62,7 @@ export async function sendWorkspaceSummary(options: {
 
   const { data, error } = await server
     .from("guests")
-    .select("name, email, phone, company, host_name, purpose, status, checked_in_at, checked_out_at")
+    .select("name, email, phone, company, host_name, purpose, status, checked_in_at, checked_out_at, checkout_method")
     .eq("owner_id", ownerId)
     .gte("created_at", start)
     .lt("created_at", end)
@@ -72,6 +74,7 @@ export async function sendWorkspaceSummary(options: {
   const guests = data as SummaryGuest[];
   const checkedIn = guests.filter((guest) => guest.status === "checked_in").length;
   const checkedOut = guests.filter((guest) => guest.status === "checked_out").length;
+  const selfCheckedOut = guests.filter((guest) => guest.status === "checked_out" && guest.checkout_method === "self").length;
   const pending = guests.filter((guest) => guest.status === "pending_approval").length;
 
   const { error: sendError } = await resend.emails.send({
@@ -83,7 +86,7 @@ export async function sendWorkspaceSummary(options: {
       "",
       `Total visitor requests: ${guests.length}`,
       `Still on site: ${checkedIn}`,
-      `Checked out: ${checkedOut}`,
+      `Checked out: ${checkedOut} (${selfCheckedOut} self, ${checkedOut - selfCheckedOut} assisted)`,
       `Awaiting approval: ${pending}`,
       "",
       "The full list is attached as a CSV file.",

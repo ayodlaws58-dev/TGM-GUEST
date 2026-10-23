@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { QRCodeSVG } from "qrcode.react";
 import {
   addEmployeeHost,
+  addEmployeeHostsBulk,
   addGuest,
   approveDemoGuest,
   getReceptionWorkspace,
@@ -309,6 +310,8 @@ export default function Home() {
     total: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out").length,
     onSite: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in").length,
     checkedOut: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_out").length,
+    selfCheckedOut: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_out" && guest.checkout_method === "self").length,
+    assistedCheckedOut: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_out" && guest.checkout_method !== "self").length,
   }), [purposeFilteredReportGuests]);
 
   const filteredGuests = useMemo(() => {
@@ -706,18 +709,24 @@ export default function Home() {
               <StatCard label="Currently on site" value={reportStats.onSite} caption="Visitors in the office" icon="check" color="mint" trend="On site" />
               <StatCard label="Visits completed" value={reportStats.checkedOut} caption="Checked out in this period" icon="clock" color="peach" trend="Completed" />
             </section>
+            <section className="stats-grid">
+              <StatCard label="Self checked out" value={reportStats.selfCheckedOut} caption="Visitors who checked themselves out" icon="check" color="mint" trend="Self" />
+              <StatCard label="Assisted check-out" value={reportStats.assistedCheckedOut} caption="Checked out by reception staff" icon="users" color="lavender" trend="Assisted" />
+              <StatCard label="All check-outs" value={reportStats.checkedOut} caption="Self plus assisted" icon="clock" color="peach" trend="Total" />
+            </section>
             <section className="panel guest-panel daily-report-table">
               <div className="guest-panel-heading"><div><div className="title-with-count"><h2>{reportPeriod === "daily" ? "Daily visitors" : reportPeriod === "weekly" ? "Weekly visitors" : "Monthly visitors"}</h2><span className="table-count">{purposeFilteredReportGuests.length}</span></div><p>{reportPurpose === "all" ? `All visitor requests for this ${reportPeriod === "daily" ? "day" : reportPeriod === "weekly" ? "week" : "month"}` : `${reportPurpose} visits for this ${reportPeriod === "daily" ? "day" : reportPeriod === "weekly" ? "week" : "month"}`}</p></div></div>
               <div className="table-scroll"><table>
-                <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th></tr></thead>
+                <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th><th>CHECK-OUT</th></tr></thead>
                 <tbody>
-                  {reportLoading ? <tr><td colSpan={6} className="table-message"><span className="spinner" />Loading saved visitor records…</td></tr>
-                    : purposeFilteredReportGuests.length === 0 ? <tr><td colSpan={6} className="table-message">No visitors found for this purpose during this period.</td></tr>
+                  {reportLoading ? <tr><td colSpan={7} className="table-message"><span className="spinner" />Loading saved visitor records…</td></tr>
+                    : purposeFilteredReportGuests.length === 0 ? <tr><td colSpan={7} className="table-message">No visitors found for this purpose during this period.</td></tr>
                       : purposeFilteredReportGuests.map((guest, index) => <tr key={guest.id}>
                         <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
                         <td>{guest.purpose}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td>
                         <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span></td><td className="arrival-cell">{formatTime(guest.checked_in_at)}</td>
-                      </tr>)}
+                                                <td className="company-cell">{guest.status === "checked_out" ? `${guest.checkout_method === "self" ? "Self" : "Assisted"} · ${formatTime(guest.checked_out_at)}` : "—"}</td>
+                                              </tr>)}
                 </tbody>
               </table></div>
               <div className="table-footer"><span>Showing <strong>{purposeFilteredReportGuests.length}</strong> visitor{purposeFilteredReportGuests.length === 1 ? "" : "s"}</span><span>{formatReportRange(reportPeriod)}</span></div>
@@ -938,6 +947,9 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -969,6 +981,41 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
     }
   }
 
+  async function importHosts(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBulkSaving(true);
+    setError("");
+    setBulkMessage("");
+    try {
+      const result = await addEmployeeHostsBulk(bulkText);
+      if (result.added > 0) {
+        await refresh();
+        await onHostsChanged();
+      }
+      const summary = `${result.added} added${result.skipped ? `, ${result.skipped} already in the directory` : ""}.`;
+      if (result.errors.length > 0) {
+        setError(`${result.added > 0 ? summary + " " : ""}Skipped lines with problems: ${result.errors.slice(0, 5).join(" ")}${result.errors.length > 5 ? ` (+${result.errors.length - 5} more)` : ""}`);
+        if (result.added > 0) setBulkText("");
+      } else {
+        setBulkMessage(summary);
+        setBulkText("");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to import employees.");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  async function loadBulkFile(file: File | undefined) {
+    if (!file) return;
+    if (file.size > 512_000) {
+      setError("That file is too large. Import up to a few thousand employees at a time.");
+      return;
+    }
+    setBulkText(await file.text());
+  }
+
   async function deactivateHost(host: EmployeeHost) {
     setError("");
     try {
@@ -988,6 +1035,12 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
       <label>Work email<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="jordan@company.com" maxLength={254} required /></label>
       <button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add employee"}</button>
     </form>
+    <form className="directory-form guest-form bulk-form" onSubmit={importHosts}>
+      <label>Add many employees at once<textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} rows={5} placeholder={"One per line: Full name, email\nJordan Lee, jordan@company.com\nAlex Smith, alex@company.com"} /></label>
+      <label className="bulk-file">Or upload a CSV file<input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { void loadBulkFile(event.target.files?.[0]); event.target.value = ""; }} /></label>
+      <button className="secondary-button" type="submit" disabled={bulkSaving || !bulkText.trim()}>{bulkSaving ? "Importing…" : "Import employees"}</button>
+    </form>
+    {bulkMessage && <p className="form-success directory-error" role="status">{bulkMessage}</p>}
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
     {loading ? <p className="directory-empty">Loading employee directory…</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <ul className="host-list">{hosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
   </section>;
