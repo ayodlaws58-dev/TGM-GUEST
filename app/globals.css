@@ -428,3 +428,4 @@ tbody tr:last-child td { border-bottom: 0; }
   #guest-qr, #guest-qr * { visibility: visible; }
   #guest-qr { position: absolute; inset: 0; display: grid; place-items: center; }
 }
+.turnstile-slot { display: flex; justify-content: center; min-height: 65px; }
