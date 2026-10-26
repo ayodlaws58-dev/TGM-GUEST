@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import {
   VISIT_PURPOSES,
   type GuestStatus,
 } from "../../../lib/guests";
+import TurnstileWidget, { type TurnstileHandle } from "../../components/TurnstileWidget";
 
 type VisitReceipt = {
   name: string;
@@ -31,6 +32,8 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState<VisitReceipt | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle | null>(null);
   useEffect(() => {
     let active = true;
     params.then(async ({ token: receptionToken }) => {
@@ -103,6 +106,11 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
       setSaving(false);
       return;
     }
+    if (!captchaToken) {
+      setError("Please complete the security check before requesting check-in.");
+      setSaving(false);
+      return;
+    }
 
     try {
       const registered = await registerVisitor(token, {
@@ -114,7 +122,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
         company: String(form.get("company") ?? "").trim(),
         host_name,
         purpose,
-      });
+      }, { turnstileToken: captchaToken });
       if (!registered) {
         setError("This reception QR code is invalid. Please ask the front desk for help.");
         return;
@@ -122,6 +130,8 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
       setReceipt(registered);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to check you in. Please ask the front desk for help.");
+      // A Turnstile token is single-use, so get a fresh one for the retry.
+      captchaRef.current?.reset();
     } finally {
       setSaving(false);
     }
@@ -150,8 +160,9 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
               <label>Company <span className="optional-label">Optional</span><input name="company" autoComplete="organization" placeholder="e.g. Acme Inc." maxLength={120} /></label>
               <label>Who are you visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hosts.map((host) => <option key={host} value={host}>{host}</option>)}</select></label>
               <label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>
+              <TurnstileWidget onToken={setCaptchaToken} onError={setError} handleRef={captchaRef} />
               {error && <p className="form-error" role="alert">{error}</p>}
-              <button className="primary-button full-button confirm-checkin" disabled={saving || hosts.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : "Request check-in"}</button>
+              <button className="primary-button full-button confirm-checkin" disabled={saving || hosts.length === 0 || !captchaToken}>{saving ? <><span className="button-spinner" /> Submitting…</> : "Request check-in"}</button>
               {hosts.length === 0 && <p className="form-error">The employee directory is empty. Please speak with reception.</p>}
             </form>
           </>

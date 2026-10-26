@@ -195,7 +195,9 @@ export async function listGuests(period: VisitorReportPeriod = "daily"): Promise
 }
 
 export async function addGuest(input: NewGuest, receptionToken: string): Promise<void> {
-  const registered = await registerVisitor(receptionToken, input);
+  // Reception staff are signed in, so their session authorises the request instead of a CAPTCHA.
+  const session = (await getSupabase()?.auth.getSession())?.data.session;
+  const registered = await registerVisitor(receptionToken, input, { accessToken: session?.access_token });
   if (!registered) throw new Error("Unable to add visitor: the reception QR code is invalid.");
 }
 
@@ -269,25 +271,28 @@ export async function updateCompanyName(name: string): Promise<void> {
   window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify({ ...workspace, company_name: name }));
 }
 
+export type RegisterVisitorAuth = { turnstileToken?: string | null; accessToken?: string };
+
 export async function registerVisitor(
   receptionToken: string,
   input: NewGuest,
+  auth: RegisterVisitorAuth = {},
 ): Promise<(Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> & { visit_token: string }) | null> {
   const client = getSupabase();
   if (client) {
-    const { data, error } = await client.rpc("register_visitor_by_qr", {
-      reception_token: receptionToken,
-      visitor_first_name: input.first_name,
-      visitor_middle_name: input.middle_name || null,
-      visitor_last_name: input.last_name,
-      visitor_email: input.email,
-      visitor_phone: input.phone,
-      visitor_company: input.company,
-      visitor_host: input.host_name,
-      visit_purpose: input.purpose,
+    // Registration goes through the server so the CAPTCHA (or staff session) is verified before anything is saved.
+    const response = await fetch("/api/visitors/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}),
+      },
+      body: JSON.stringify({ ...input, reception_token: receptionToken, turnstile_token: auth.turnstileToken ?? null }),
     });
-    if (error) throw error;
-    return (data?.[0] as (Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> & { visit_token: string }) | undefined) ?? null;
+    if (response.status === 404) return null;
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(result.error || "Unable to check you in. Please ask the front desk for help.");
+    return result as unknown as Pick<Guest, "name" | "company" | "host_name" | "status" | "checked_in_at"> & { visit_token: string };
   }
 
   const workspace = await getReceptionWorkspace();
