@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 // The site key is public by design. Override per environment with NEXT_PUBLIC_TURNSTILE_SITE_KEY.
-export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAFmtVco9i89y40wQ";
+export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAFmqysCEQdxt8qlx";
 
 type TurnstileApi = {
   render: (container: HTMLElement, options: Record<string, unknown>) => string;
