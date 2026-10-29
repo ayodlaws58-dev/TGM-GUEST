@@ -101,7 +101,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
     const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
-    if (!first_name || !last_name || !email || !phone || !host_name || !purpose) {
+    if (!first_name || !last_name || !phone || !host_name || !purpose) {
       setError("Enter your full name (first and last) and complete all required fields to check in.");
       setSaving(false);
       return;
@@ -155,7 +155,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
             <p className="checkin-description">Please share a few details. Reception will verify your arrival and notify your host.</p>
             <form className="guest-form visitor-form" onSubmit={handleSubmit}>
               <label>Full name<input name="full_name" autoComplete="name" placeholder="e.g. Jordan Taylor Lee" maxLength={120} required /></label>
-              <label>Email address<input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} required /></label>
+              <label>Email address<span className="optional-label">Optional</span><input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} required /></label>
               <label>Phone number<input name="phone" type="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" maxLength={32} required /></label>
               <label>Company <span className="optional-label">Optional</span><input name="company" autoComplete="organization" placeholder="e.g. Acme Inc." maxLength={120} /></label>
               <label>Who are you visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hosts.map((host) => <option key={host} value={host}>{host}</option>)}</select></label>
