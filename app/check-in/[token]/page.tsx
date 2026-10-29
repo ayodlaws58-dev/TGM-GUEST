@@ -13,6 +13,7 @@ import {
   type GuestStatus,
 } from "../../../lib/guests";
 import TurnstileWidget, { type TurnstileHandle } from "../../components/TurnstileWidget";
+import HostSearch from "../../components/HostSearch";
 
 type VisitReceipt = {
   name: string;
@@ -158,7 +159,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
               <label>Email address<span className="optional-label">Optional</span><input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} required /></label>
               <label>Phone number<input name="phone" type="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" maxLength={32} required /></label>
               <label>Company <span className="optional-label">Optional</span><input name="company" autoComplete="organization" placeholder="e.g. Acme Inc." maxLength={120} /></label>
-              <label>Who are you visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hosts.map((host) => <option key={host} value={host}>{host}</option>)}</select></label>
+              <HostSearch hosts={hosts} name="host_name" label="Who are you visiting?" />
               <label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>
               <TurnstileWidget onToken={setCaptchaToken} onError={setError} handleRef={captchaRef} />
               {error && <p className="form-error" role="alert">{error}</p>}
