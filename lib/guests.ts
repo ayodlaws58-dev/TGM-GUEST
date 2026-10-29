@@ -9,7 +9,7 @@ export const VISIT_PURPOSES = ["Meeting", "Interview", "Delivery", "Client visit
 export type Guest = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   company: string;
   host_name: string;
@@ -304,7 +304,7 @@ export async function registerVisitor(
   const name = [input.first_name, input.middle_name, input.last_name].filter(Boolean).join(" ");
   const guest: Guest = {
     name,
-    email: input.email,
+    email: input.email || null,
     phone: input.phone,
     company: input.company,
     purpose: input.purpose,

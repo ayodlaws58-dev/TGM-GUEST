@@ -318,7 +318,7 @@ export default function Home() {
     const normalizedQuery = query.trim().toLowerCase();
     return guests.filter((guest) => {
       const matchesQuery = !normalizedQuery || [
-        guest.name, guest.email, guest.phone ?? "", guest.company, guest.host_name, guest.purpose,
+        guest.name, guest.email ?? "", guest.phone ?? "", guest.company, guest.host_name, guest.purpose,
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
       return matchesQuery && (filter === "all" || guest.status === filter);
     });
@@ -449,7 +449,11 @@ export default function Home() {
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
     if (!first_name || !last_name || !phone || !host_name || !purpose) {
+<<<<<<< HEAD
       setFormError("Enter the visitor's first and last name, details, host, and visit purpose.");
+=======
+      setFormError("Enter the visitor's first and last name, phone number, host, and visit purpose.");
+>>>>>>> bd004d3064fa1c99107dd7ef3c7b9893c0d33842
       setSaving(false);
       return;
     }
@@ -722,7 +726,7 @@ export default function Home() {
                   {reportLoading ? <tr><td colSpan={7} className="table-message"><span className="spinner" />Loading saved visitor records…</td></tr>
                     : purposeFilteredReportGuests.length === 0 ? <tr><td colSpan={7} className="table-message">No visitors found for this purpose during this period.</td></tr>
                       : purposeFilteredReportGuests.map((guest, index) => <tr key={guest.id}>
-                        <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
+                        <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong>{guest.email && <small>{guest.email}</small>}{guest.phone && <small>{guest.phone}</small>}</span></div></td>
                         <td>{guest.purpose}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td>
                         <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span></td><td className="arrival-cell">{formatTime(guest.checked_in_at)}</td>
                                                 <td className="company-cell">{guest.status === "checked_out" ? `${guest.checkout_method === "self" ? "Self" : "Assisted"} · ${formatTime(guest.checked_out_at)}` : "—"}</td>
@@ -738,7 +742,7 @@ export default function Home() {
         </div>
       </main>
 
-      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="full_name" placeholder="e.g. Jordan Taylor Lee" autoComplete="name" required maxLength={240} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
+      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="full_name" placeholder="e.g. Jordan Taylor Lee" autoComplete="name" required maxLength={240} /></label><label>Email address <span className="optional-label">Optional</span><input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
 
       {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p>{receptionToken && isPrivateHost(getReceptionBase()) && <p className="form-error" role="alert">This code points to {getReceptionBase()}, which only works on this network. To work on Wi-Fi and mobile data, open the dashboard from your public https:// site address (or set NEXT_PUBLIC_SITE_URL) and download the code again.</p>}<button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
     </div>
@@ -791,7 +795,7 @@ function GuestTable({
           {loading ? <tr><td colSpan={7} className="table-message"><span className="spinner" />Loading today&apos;s visitors…</td></tr>
             : guests.length === 0 ? <tr><td colSpan={7} className="table-message"><div className="empty-state"><span className="empty-icon"><Icon name="users" size={21} /></span><strong>No visitors found</strong><span>Try another search or add a visitor to today&apos;s log.</span><button className="primary-button" onClick={onAdd}><Icon name="plus" size={16} /> Add visitor</button></div></td></tr>
               : guests.map((guest, index) => <tr key={guest.id}>
-                <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
+                <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong>{guest.email && <small>{guest.email}</small>}{guest.phone && <small>{guest.phone}</small>}</span></div></td>
                 <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span>{guest.status === "checked_in" && guest.host_notified_at && <small className="notification-sent">Host notified</small>}</td>
                 <td className="arrival-cell">{formatTime(guest.checked_in_at)}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td><td className="company-cell" title={guest.purpose}>{guest.purpose}</td>
                 <td><div className="row-actions">
@@ -950,6 +954,7 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
   const [bulkText, setBulkText] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState("");
+  const [filter, setFilter] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1027,6 +1032,11 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
     }
   }
 
+  const filterTokens = filter.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const visibleHosts = filterTokens.length === 0
+    ? hosts
+    : hosts.filter((host) => filterTokens.every((token) => `${host.name} ${host.email}`.toLowerCase().includes(token)));
+
   return <section className="panel settings-card directory-card">
     <div className="settings-heading"><span className="settings-status-icon"><Icon name="users" size={20} /></span><div><h2>Employee host directory</h2><p>Visitors choose from these names; approvals notify the matching email address.</p></div></div>
     {!configured && <p className="directory-demo-note">Demo addresses are placeholders. Real email is only sent after Supabase and Resend are configured.</p>}
@@ -1042,6 +1052,9 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
     </form>
     {bulkMessage && <p className="form-success directory-error" role="status">{bulkMessage}</p>}
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
-    {loading ? <p className="directory-empty">Loading employee directory…</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <ul className="host-list">{hosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
+    {loading ? <p className="directory-empty">Loading employee directory…</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <>
+      {hosts.length > 6 && <div className="directory-filter guest-form"><input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search employees by name or email" aria-label="Search employees" /><span className="directory-count">{visibleHosts.length} of {hosts.length}</span></div>}
+      {visibleHosts.length === 0 ? <p className="directory-empty">No employees match &ldquo;{filter.trim()}&rdquo;.</p> : <ul className="host-list">{visibleHosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
+    </>}
   </section>;
 }
