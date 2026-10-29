@@ -448,7 +448,7 @@ export default function Home() {
     const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
-    if (!first_name || !last_name || !email || !phone || !host_name || !purpose) {
+    if (!first_name || !last_name || !phone || !host_name || !purpose) {
       setFormError("Enter the visitor's first and last name, details, host, and visit purpose.");
       setSaving(false);
       return;
