@@ -6,7 +6,7 @@ const WAT_OFFSET_MS = 60 * 60 * 1000;
 
 type SummaryGuest = {
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   company: string;
   host_name: string;
@@ -37,7 +37,7 @@ function csvCell(value: string | null) {
 function buildCsv(guests: SummaryGuest[]) {
   const header = ["Name", "Email", "Phone", "Company", "Host", "Purpose", "Status", "Checked in", "Checked out", "Check-out method"];
   const rows = guests.map((guest) => [
-    guest.name, guest.email, guest.phone, guest.company, guest.host_name, guest.purpose,
+    guest.name, guest.email ?? "", guest.phone, guest.company, guest.host_name, guest.purpose,
     guest.status.replace("_", " "), formatWat(guest.checked_in_at), formatWat(guest.checked_out_at),
     guest.status === "checked_out" ? (guest.checkout_method === "self" ? "Self" : "Assisted") : "",
   ].map(csvCell).join(","));
