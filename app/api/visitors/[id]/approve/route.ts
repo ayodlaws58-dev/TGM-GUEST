@@ -6,7 +6,7 @@ type VisitorDetails = {
   id: string;
   owner_id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   company: string;
   host_name: string;
@@ -108,7 +108,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       `Hello ${host.name},`,
       "",
       `${visitor.name} has been approved by reception and is checked in to visit you.`,
-      `Visitor email: ${visitor.email}`,
+      `Visitor email: ${visitor.email || "Not provided"}`,
       `Visitor phone: ${visitor.phone || "Not provided"}`,
       `Company: ${visitor.company || "Not provided"}`,
       `Purpose: ${visitor.purpose}`,
