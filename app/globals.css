@@ -429,3 +429,10 @@ tbody tr:last-child td { border-bottom: 0; }
   #guest-qr { position: absolute; inset: 0; display: grid; place-items: center; }
 }
 .turnstile-slot { display: flex; justify-content: center; min-height: 65px; }
+.host-field { display: grid; gap: 6px; color: #555862; font-size: 10px; font-weight: 600; }
+.host-combo { position: relative; }
+.host-list { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; max-height: 220px; margin: 0; padding: 4px; overflow-y: auto; border: 1px solid #e6e7eb; border-radius: 6px; background: #fff; box-shadow: 0 12px 30px #1f223624; list-style: none; }
+.host-list li[role="option"] { padding: 10px; border-radius: 4px; color: #333641; font-size: 12px; font-weight: 400; cursor: pointer; }
+.host-list li[data-active="true"] { background: var(--navy-soft); color: var(--navy); }
+.host-list li[aria-selected="true"] { font-weight: 600; }
+.host-empty { padding: 10px; color: #858791; font-size: 11px; font-weight: 400; }
