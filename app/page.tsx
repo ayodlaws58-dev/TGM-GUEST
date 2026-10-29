@@ -950,6 +950,7 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
   const [bulkText, setBulkText] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState("");
+  const [filter, setFilter] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1027,6 +1028,11 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
     }
   }
 
+  const filterTokens = filter.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const visibleHosts = filterTokens.length === 0
+    ? hosts
+    : hosts.filter((host) => filterTokens.every((token) => `${host.name} ${host.email}`.toLowerCase().includes(token)));
+
   return <section className="panel settings-card directory-card">
     <div className="settings-heading"><span className="settings-status-icon"><Icon name="users" size={20} /></span><div><h2>Employee host directory</h2><p>Visitors choose from these names; approvals notify the matching email address.</p></div></div>
     {!configured && <p className="directory-demo-note">Demo addresses are placeholders. Real email is only sent after Supabase and Resend are configured.</p>}
@@ -1042,6 +1048,9 @@ function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean
     </form>
     {bulkMessage && <p className="form-success directory-error" role="status">{bulkMessage}</p>}
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
-    {loading ? <p className="directory-empty">Loading employee directory…</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <ul className="host-list">{hosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
+    {loading ? <p className="directory-empty">Loading employee directory…</p> : hosts.length === 0 ? <p className="directory-empty">No active employees yet. Add a host to enable visitor check-in.</p> : <>
+      {hosts.length > 6 && <div className="directory-filter guest-form"><input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search employees by name or email" aria-label="Search employees" /><span className="directory-count">{visibleHosts.length} of {hosts.length}</span></div>}
+      {visibleHosts.length === 0 ? <p className="directory-empty">No employees match &ldquo;{filter.trim()}&rdquo;.</p> : <ul className="host-list">{visibleHosts.map((host) => <li key={host.id}><span><strong>{host.name}</strong><small>{host.email}</small></span><button className="text-button" type="button" onClick={() => void deactivateHost(host)}>Deactivate</button></li>)}</ul>}
+    </>}
   </section>;
 }

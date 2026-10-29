@@ -99,7 +99,7 @@ export default function HostSearch({ hosts, name, label, placeholder = "Search f
         />
         <input type="hidden" name={name} value={selected} />
         {open && (
-          <ul id={listId} className="host-list" role="listbox" aria-label={label}>
+          <ul id={listId} className="host-search-list" role="listbox" aria-label={label}>
             {matches.map((host, index) => (
               <li
                 key={host}
