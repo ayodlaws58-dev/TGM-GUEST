@@ -28,6 +28,7 @@ import {
   type VisitorReportPeriod,
 } from "../lib/guests";
 import HostSearch from "./components/HostSearch";
+import PastReports from "./components/PastReports";
 
 type IconName = "grid" | "users" | "chart" | "settings" | "search" | "plus" | "arrow" | "check" | "clock" | "close" | "download" | "logout" | "qr";
 
@@ -660,6 +661,7 @@ export default function Home() {
           <button className={`nav-item ${page === "Overview" ? "active" : ""}`} onClick={() => setPage("Overview")}><Icon name="grid" />Overview</button>
           <button className={`nav-item ${page === "Visitors" ? "active" : ""}`} onClick={() => setPage("Visitors")}><Icon name="users" />Visitors<span className="nav-count">{stats.total}</span></button>
           <button className={`nav-item ${page === "Analytics" ? "active" : ""}`} onClick={() => setPage("Analytics")}><Icon name="chart" />Visitor report</button>
+          <button className={`nav-item ${page === "Past reports" ? "active" : ""}`} onClick={() => setPage("Past reports")}><Icon name="clock" />Past reports</button>
           {accessRole === "admin" && <button className={`nav-item ${page === "Settings" ? "active" : ""}`} onClick={() => setPage("Settings")}><Icon name="settings" />Settings</button>}
         </nav>
         <div className="sidebar-bottom">
@@ -739,6 +741,8 @@ export default function Home() {
             </section>
             <section className="panel analytics-table"><div className="panel-heading"><div><h2>Visits by host</h2><p>Employees welcoming visitors in this period</p></div></div><div className="analytics-bars">{hostCounts.length ? hostCounts.map(([host, count]) => <div className="analytics-row" key={host}><span>{host}</span><div className="analytics-track"><i style={{ width: `${reportStats.total ? count / reportStats.total * 100 : 0}%`, background: "#5968de" }} /></div><strong>{count}</strong></div>) : <p className="settings-heading">No visitor activity recorded in this period.</p>}</div></section>
           </>}
+
+          {page === "Past reports" && <PastReports />}
 
           {page === "Settings" && accessRole === "admin" && <SettingsPanel configured={hasSupabaseConfig} companyName={companyName} onShowQr={() => setShowQr(true)} onSaveCompanyName={saveCompanyName} onHostsChanged={async () => { const hosts = await listEmployeeHosts(); setHostNames(hosts.map((host) => host.name)); }} />}
         </div>

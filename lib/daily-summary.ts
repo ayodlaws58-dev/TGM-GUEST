@@ -1,48 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Resend } from "resend";
-
-// West Africa Time (Africa/Lagos) is UTC+1 all year with no daylight saving.
-const WAT_OFFSET_MS = 60 * 60 * 1000;
-
-type SummaryGuest = {
-  name: string;
-  email: string | null;
-  phone: string | null;
-  company: string;
-  host_name: string;
-  purpose: string;
-  status: string;
-  checked_in_at: string | null;
-  checked_out_at: string | null;
-  checkout_method: string | null;
-};
-
-const watFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Lagos",
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function formatWat(value: string | null) {
-  return value ? watFormatter.format(new Date(value)) : "";
-}
-
-function csvCell(value: string | null) {
-  let text = value ?? "";
-  // Prevent spreadsheet formula injection from visitor-supplied text.
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-function buildCsv(guests: SummaryGuest[]) {
-  const header = ["Name", "Email", "Phone", "Company", "Host", "Purpose", "Status", "Checked in", "Checked out", "Check-out method"];
-  const rows = guests.map((guest) => [
-    guest.name, guest.email ?? "", guest.phone, guest.company, guest.host_name, guest.purpose,
-    guest.status.replace("_", " "), formatWat(guest.checked_in_at), formatWat(guest.checked_out_at),
-    guest.status === "checked_out" ? (guest.checkout_method === "self" ? "Self" : "Assisted") : "",
-  ].map(csvCell).join(","));
-  return [header.map(csvCell).join(","), ...rows].join("\r\n");
-}
+import { buildVisitorCsv, WAT_OFFSET_MS, type ReportGuest } from "./report-format";
 
 export async function sendWorkspaceSummary(options: {
   server: SupabaseClient;
@@ -71,7 +29,7 @@ export async function sendWorkspaceSummary(options: {
     console.error("Unable to load visitors for the daily summary:", error.message);
     return { ok: false, error: "Unable to load today's visitors." };
   }
-  const guests = data as SummaryGuest[];
+  const guests = data as ReportGuest[];
   const checkedIn = guests.filter((guest) => guest.status === "checked_in").length;
   const checkedOut = guests.filter((guest) => guest.status === "checked_out").length;
   const selfCheckedOut = guests.filter((guest) => guest.status === "checked_out" && guest.checkout_method === "self").length;
@@ -91,7 +49,7 @@ export async function sendWorkspaceSummary(options: {
       "",
       "The full list is attached as a CSV file.",
     ].join("\n"),
-    attachments: [{ filename: `visitors-${dateLabel}.csv`, content: Buffer.from(buildCsv(guests), "utf-8") }],
+    attachments: [{ filename: `visitors-${dateLabel}.csv`, content: Buffer.from(buildVisitorCsv(guests), "utf-8") }],
   }, idempotencyKey ? { idempotencyKey } : undefined);
   if (sendError) {
     console.error("Unable to send the daily summary:", sendError.message);
