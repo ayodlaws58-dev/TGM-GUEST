@@ -194,6 +194,35 @@ export async function listGuests(period: VisitorReportPeriod = "daily"): Promise
   return data as Guest[];
 }
 
+// Every visitor created in [start, end), oldest first. Used by the Past reports page.
+export async function listGuestsInRange(start: string, end: string): Promise<Guest[]> {
+  const client = getSupabase();
+  if (!client) {
+    return loadLocalGuests()
+      .filter((guest) => guest.created_at >= start && guest.created_at < end)
+      .map((guest) => ({ ...guest, phone: guest.phone ?? null }))
+      .sort((first, second) => first.created_at.localeCompare(second.created_at));
+  }
+
+  // Page through the results: Supabase returns at most 1000 rows per request.
+  const pageSize = 1000;
+  const guests: Guest[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client
+      .from("guests")
+      .select("id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, checkout_method, host_notified_at, created_at")
+      .gte("created_at", start)
+      .lt("created_at", end)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    guests.push(...(data as Guest[]));
+    if (data.length < pageSize) break;
+  }
+  return guests;
+}
+
 export async function addGuest(input: NewGuest, receptionToken: string): Promise<void> {
   // Reception staff are signed in, so their session authorises the request instead of a CAPTCHA.
   const session = (await getSupabase()?.auth.getSession())?.data.session;
