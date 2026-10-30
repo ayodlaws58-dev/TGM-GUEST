@@ -156,7 +156,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
             <p className="checkin-description">Please share a few details. Reception will verify your arrival and notify your host.</p>
             <form className="guest-form visitor-form" onSubmit={handleSubmit}>
               <label>Full name<input name="full_name" autoComplete="name" placeholder="e.g. Jordan Taylor Lee" maxLength={120} required /></label>
-              <label>Email address<span className="optional-label">Optional</span><input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} required /></label>
+              <label>Email address<span className="optional-label">Optional</span><input name="email" type="email" autoComplete="email" placeholder="jordan@company.com" maxLength={254} /></label>
               <label>Phone number<input name="phone" type="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" maxLength={32} required /></label>
               <label>Company <span className="optional-label">Optional</span><input name="company" autoComplete="organization" placeholder="e.g. Acme Inc." maxLength={120} /></label>
               <HostSearch hosts={hosts} name="host_name" label="Who are you visiting?" />

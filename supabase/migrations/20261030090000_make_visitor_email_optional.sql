@@ -1,6 +1,10 @@
--- A visitor's email address is optional when reception adds them.
--- Blank emails are stored as NULL; an email that is entered is still validated.
--- (Visitors without an email cannot use emailed-code self-checkout; reception checks them out.)
+-- A visitor's email address is optional. Blank emails are stored as NULL; an email that is
+-- entered is still validated. (Visitors without an email can't use emailed-code self-checkout;
+-- reception checks them out.)
+--
+-- Written against the function as deployed (20261026124500: geofence arguments + service-role guard),
+-- so the existing 11-argument signature is replaced in place rather than adding an overload.
+-- CREATE OR REPLACE keeps the existing grants.
 alter table public.guests alter column email drop not null;
 
 create or replace function public.register_visitor_by_qr(
@@ -12,7 +16,9 @@ create or replace function public.register_visitor_by_qr(
   visitor_phone text,
   visitor_company text,
   visitor_host text,
-  visit_purpose text
+  visit_purpose text,
+  visitor_lat double precision default null,
+  visitor_lng double precision default null
 )
 returns table(
   name text,
@@ -31,6 +37,11 @@ declare
   matched_host public.employee_hosts%rowtype;
   visitor_full_name text;
 begin
+  -- Only the server may register visitors, after it has verified the human check.
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'Visitor registration must go through the check-in service.';
+  end if;
+
   visitor_full_name := concat_ws(
     ' ',
     nullif(btrim(visitor_first_name), ''),
@@ -71,6 +82,8 @@ begin
   if workspace_owner_id is null then
     return;
   end if;
+
+  perform public.assert_within_geofence(workspace_owner_id, visitor_lat, visitor_lng);
 
   select h.* into matched_host
   from public.employee_hosts as h
@@ -117,7 +130,3 @@ begin
       public.guests.status, public.guests.checked_in_at, public.guests.visit_token;
 end;
 $$;
-
--- create or replace keeps the existing grants, but restate them: only the server (service role) may call this.
-revoke all on function public.register_visitor_by_qr(uuid, text, text, text, text, text, text, text, text) from public, anon, authenticated;
-grant execute on function public.register_visitor_by_qr(uuid, text, text, text, text, text, text, text, text) to service_role;
