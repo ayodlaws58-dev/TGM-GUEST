@@ -102,8 +102,13 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
     const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
-    if (!first_name || !last_name || !phone || !host_name || !purpose) {
-      setError("Enter your full name (first and last) and complete all required fields to check in.");
+    const missing = !first_name || !last_name ? "Enter your first and last name."
+      : !phone ? "Enter your phone number."
+      : !host_name ? "Choose who you are visiting from the list."
+      : !purpose ? "Choose the purpose of your visit."
+      : "";
+    if (missing) {
+      setError(missing);
       setSaving(false);
       return;
     }

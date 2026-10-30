@@ -22,6 +22,31 @@ function jsonError(message: string, status: number) {
 }
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
+const emailPattern = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+
+// Mirrors the database rules so the visitor is told exactly which field to fix.
+function validateVisitor(input: RegisterInput): string | null {
+  const first = text(input.first_name).trim();
+  const middle = text(input.middle_name).trim();
+  const last = text(input.last_name).trim();
+  const email = text(input.email).trim();
+  const phone = text(input.phone).trim();
+  const host = text(input.host_name).trim();
+  const purpose = text(input.purpose).trim();
+
+  if (!first || !last) return "Enter your first and last name.";
+  if (first.length > 120 || middle.length > 120 || last.length > 120 || [first, middle, last].filter(Boolean).join(" ").length > 120) {
+    return "Your name is too long. Please use 120 characters or fewer.";
+  }
+  if (email && (email.length > 254 || !emailPattern.test(email))) return "That email address doesn't look right. Fix it, or leave the email blank.";
+  if (!phone) return "Enter your phone number.";
+  if (phone.length > 32) return "Your phone number is too long. Please use 32 characters or fewer.";
+  if (text(input.company).length > 120) return "The company name is too long. Please use 120 characters or fewer.";
+  if (!host) return "Choose who you are visiting.";
+  if (!purpose) return "Choose the purpose of your visit.";
+  if (purpose.length > 240) return "The purpose of your visit is too long. Please use 240 characters or fewer.";
+  return null;
+}
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -62,6 +87,9 @@ export async function POST(request: Request) {
     }
   }
 
+  const problem = validateVisitor(input);
+  if (problem) return jsonError(problem, 400);
+
   const serverClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
@@ -70,17 +98,27 @@ export async function POST(request: Request) {
     visitor_first_name: text(input.first_name),
     visitor_middle_name: text(input.middle_name) || null,
     visitor_last_name: text(input.last_name),
-    visitor_email: text(input.email),
+    visitor_email: text(input.email).trim(),
     visitor_phone: text(input.phone),
     visitor_company: text(input.company),
     visitor_host: text(input.host_name),
     visit_purpose: text(input.purpose),
   });
   if (error) {
-    // The RPC raises plain-language validation messages (bad email, unknown host, and so on).
-    const userFacing = /^(Enter valid|Choose an employee)/.test(error.message);
-    if (!userFacing) console.error("Unable to register a visitor:", error.message);
-    return jsonError(userFacing ? error.message : "Unable to check you in. Please ask the front desk for help.", userFacing ? 400 : 503);
+    if (/^Choose an employee/.test(error.message)) return jsonError("That person isn't in the employee directory. Please choose someone from the list.", 400);
+    // Every field was checked above, so the database's generic "Enter valid visitor details" means the
+    // database is out of date. The likely cause is a blank email on a database that still requires one.
+    if (/^Enter valid/.test(error.message)) {
+      console.error("Database rejected a visitor that passed validation. Apply the email-optional migration (supabase/migrations/20261030090000_make_visitor_email_optional.sql):", error.message);
+      return jsonError(
+        text(input.email).trim()
+          ? "We couldn't check you in with those details. Please ask the front desk for help."
+          : "An email address is required right now. Please enter one, or ask the front desk for help.",
+        400,
+      );
+    }
+    console.error("Unable to register a visitor:", error.message);
+    return jsonError("Unable to check you in. Please ask the front desk for help.", 503);
   }
 
   const visitor = data?.[0];

@@ -449,8 +449,13 @@ export default function Home() {
     const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
-    if (!first_name || !last_name || !phone || !host_name || !purpose) {
-      setFormError("Enter the visitor's first and last name, phone number, host, and visit purpose.");
+    const missing = !first_name || !last_name ? "Enter the visitor's first and last name."
+      : !phone ? "Enter the visitor's phone number."
+      : !host_name ? "Choose who the visitor is seeing from the list."
+      : !purpose ? "Choose the purpose of the visit."
+      : "";
+    if (missing) {
+      setFormError(missing);
       setSaving(false);
       return;
     }
