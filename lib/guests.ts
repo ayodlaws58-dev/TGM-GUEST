@@ -34,7 +34,7 @@ export type NewGuest = {
   purpose: string;
 };
 export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
-export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" | "super_admin" };
+export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" | "super_admin" | "developer" };
 export type ReceptionMember = { user_id: string; email: string; created_at: string };
 
 const STORAGE_KEY = "tgm-check-in-visits";

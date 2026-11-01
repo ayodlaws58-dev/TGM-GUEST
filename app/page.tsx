@@ -136,7 +136,7 @@ export default function Home() {
   const [companyName, setCompanyName] = useState("");
   const [receptionToken, setReceptionToken] = useState("");
   const [workspaceOwnerId, setWorkspaceOwnerId] = useState("");
-  const [accessRole, setAccessRole] = useState<"admin" | "reception" | "super_admin">("admin");
+  const [accessRole, setAccessRole] = useState<"admin" | "reception" | "super_admin" | "developer">("admin");
   const [accessError, setAccessError] = useState("");
   const [hostNames, setHostNames] = useState<string[]>([]);
   const [page, setPage] = useState("Overview");
@@ -238,10 +238,10 @@ export default function Home() {
     if (!authReady || (hasSupabaseConfig && !session)) return;
     void refreshGuests();
     getReceptionWorkspace().then(async (workspace) => {
-      if (workspace.role === "super_admin") {
+      if (workspace.role === "super_admin" || workspace.role === "developer") {
         const allWorkspaces = await listAllWorkspaces();
         setWorkspaces(allWorkspaces);
-        setCompanyName("System Admin");
+        setCompanyName("System");
       } else {
         const hosts = workspace.role === "admin"
           ? (await listEmployeeHosts()).map((host) => host.name)
@@ -665,23 +665,23 @@ export default function Home() {
     <div className="app-shell">
       <aside className="sidebar">
         <a href="#" className="brand" aria-label="TGM Check-in home"><Image className="brand-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={190} height={60} priority /></a>
-        <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || (accessRole === "super_admin" ? "System Admin" : "Your company")}</strong><small>{accessRole === "super_admin" ? "Super admin" : "Visitor workspace"}</small></span><span className="chevron">⌄</span></div>
+        <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || (accessRole === "super_admin" || accessRole === "developer" ? "System" : "Your company")}</strong><small>{accessRole === "super_admin" ? "Super admin" : accessRole === "developer" ? "Developer" : "Visitor workspace"}</small></span><span className="chevron">⌄</span></div>
         <p className="nav-label">WORKSPACE</p>
         <nav className="main-nav" aria-label="Main navigation">
           <button className={`nav-item ${page === "Overview" ? "active" : ""}`} onClick={() => setPage("Overview")}><Icon name="grid" />Overview</button>
-          {accessRole !== "super_admin" && <>
+          {accessRole !== "super_admin" && accessRole !== "developer" && <>
             <button className={`nav-item ${page === "Visitors" ? "active" : ""}`} onClick={() => setPage("Visitors")}><Icon name="users" />Visitors<span className="nav-count">{stats.total}</span></button>
             <button className={`nav-item ${page === "Analytics" ? "active" : ""}`} onClick={() => setPage("Analytics")}><Icon name="chart" />Visitor report</button>
             <button className={`nav-item ${page === "Past reports" ? "active" : ""}`} onClick={() => setPage("Past reports")}><Icon name="clock" />Past reports</button>
           </>}
-          {accessRole === "super_admin" && <>
+          {(accessRole === "super_admin" || accessRole === "developer") && <>
             <button className={`nav-item ${page === "Companies" ? "active" : ""}`} onClick={() => setPage("Companies")}><Icon name="users" />Companies</button>
           </>}
           {accessRole === "admin" && <button className={`nav-item ${page === "Settings" ? "active" : ""}`} onClick={() => setPage("Settings")}><Icon name="settings" />Settings</button>}
         </nav>
         <div className="sidebar-bottom">
           <div className="help-card"><strong>Need a hand?</strong><p>We&apos;re here to make welcoming visitors a breeze.</p><a href="mailto:hello@tgmcheckin.com">Get in touch <Icon name="arrow" size={14} /></a></div>
-          <div className="profile"><div className="profile-avatar">{initials(accountDisplayName(session))}</div><span><strong>{accountDisplayName(session)}</strong><small>{hasSupabaseConfig ? accessRole === "super_admin" ? "Super admin" : accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
+          <div className="profile"><div className="profile-avatar">{initials(accountDisplayName(session))}</div><span><strong>{accountDisplayName(session)}</strong><small>{hasSupabaseConfig ? accessRole === "super_admin" ? "Super admin" : accessRole === "developer" ? "Developer" : accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
         </div>
       </aside>
 
@@ -759,7 +759,7 @@ export default function Home() {
 
           {page === "Past reports" && <PastReports />}
 
-          {page === "Companies" && accessRole === "super_admin" && <SuperAdminDashboard />}
+          {page === "Companies" && (accessRole === "super_admin" || accessRole === "developer") && <SuperAdminDashboard />}
 
           {page === "Settings" && accessRole === "admin" && <SettingsPanel configured={hasSupabaseConfig} companyName={companyName} onShowQr={() => setShowQr(true)} onSaveCompanyName={saveCompanyName} onHostsChanged={async () => { const hosts = await listEmployeeHosts(); setHostNames(hosts.map((host) => host.name)); }} />}
         </div>
