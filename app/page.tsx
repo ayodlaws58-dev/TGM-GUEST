@@ -12,7 +12,9 @@ import {
   getReceptionWorkspace,
   getSupabase,
   hasSupabaseConfig,
+  listAllWorkspaces,
   listEmployeeHosts,
+  listGuestsByWorkspace,
   listGuests,
   listReceptionHosts,
   listReceptionMembers,
@@ -26,6 +28,7 @@ import {
   type Guest,
   type GuestStatus,
   type VisitorReportPeriod,
+  type Workspace,
 } from "../lib/guests";
 import HostSearch from "./components/HostSearch";
 import PastReports from "./components/PastReports";
@@ -133,7 +136,7 @@ export default function Home() {
   const [companyName, setCompanyName] = useState("");
   const [receptionToken, setReceptionToken] = useState("");
   const [workspaceOwnerId, setWorkspaceOwnerId] = useState("");
-  const [accessRole, setAccessRole] = useState<"admin" | "reception">("admin");
+  const [accessRole, setAccessRole] = useState<"admin" | "reception" | "super_admin">("admin");
   const [accessError, setAccessError] = useState("");
   const [hostNames, setHostNames] = useState<string[]>([]);
   const [page, setPage] = useState("Overview");
@@ -151,6 +154,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [sendingSummary, setSendingSummary] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   useEffect(() => {
     const updateGreeting = () => setGreeting(timeGreeting(new Date()));
@@ -234,15 +238,21 @@ export default function Home() {
     if (!authReady || (hasSupabaseConfig && !session)) return;
     void refreshGuests();
     getReceptionWorkspace().then(async (workspace) => {
-      const hosts = workspace.role === "admin"
-        ? (await listEmployeeHosts()).map((host) => host.name)
-        : await listReceptionHosts(workspace.reception_token);
-      setCompanyName(workspace.company_name);
+      if (workspace.role === "super_admin") {
+        const allWorkspaces = await listAllWorkspaces();
+        setWorkspaces(allWorkspaces);
+        setCompanyName("System Admin");
+      } else {
+        const hosts = workspace.role === "admin"
+          ? (await listEmployeeHosts()).map((host) => host.name)
+          : await listReceptionHosts(workspace.reception_token);
+        setCompanyName(workspace.company_name);
+        setHostNames(hosts);
+      }
       setReceptionToken(workspace.reception_token);
       setWorkspaceOwnerId(workspace.owner_id);
       setAccessRole(workspace.role);
       setAccessError("");
-      setHostNames(hosts);
       setAccessReady(true);
     }).catch((cause: unknown) => {
       setAccessError(cause instanceof Error ? cause.message : "Unable to load your reception workspace.");
@@ -655,18 +665,23 @@ export default function Home() {
     <div className="app-shell">
       <aside className="sidebar">
         <a href="#" className="brand" aria-label="TGM Check-in home"><Image className="brand-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={190} height={60} priority /></a>
-        <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || "Your company"}</strong><small>Visitor workspace</small></span><span className="chevron">⌄</span></div>
+        <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || (accessRole === "super_admin" ? "System Admin" : "Your company")}</strong><small>{accessRole === "super_admin" ? "Super admin" : "Visitor workspace"}</small></span><span className="chevron">⌄</span></div>
         <p className="nav-label">WORKSPACE</p>
         <nav className="main-nav" aria-label="Main navigation">
           <button className={`nav-item ${page === "Overview" ? "active" : ""}`} onClick={() => setPage("Overview")}><Icon name="grid" />Overview</button>
-          <button className={`nav-item ${page === "Visitors" ? "active" : ""}`} onClick={() => setPage("Visitors")}><Icon name="users" />Visitors<span className="nav-count">{stats.total}</span></button>
-          <button className={`nav-item ${page === "Analytics" ? "active" : ""}`} onClick={() => setPage("Analytics")}><Icon name="chart" />Visitor report</button>
-          <button className={`nav-item ${page === "Past reports" ? "active" : ""}`} onClick={() => setPage("Past reports")}><Icon name="clock" />Past reports</button>
+          {accessRole !== "super_admin" && <>
+            <button className={`nav-item ${page === "Visitors" ? "active" : ""}`} onClick={() => setPage("Visitors")}><Icon name="users" />Visitors<span className="nav-count">{stats.total}</span></button>
+            <button className={`nav-item ${page === "Analytics" ? "active" : ""}`} onClick={() => setPage("Analytics")}><Icon name="chart" />Visitor report</button>
+            <button className={`nav-item ${page === "Past reports" ? "active" : ""}`} onClick={() => setPage("Past reports")}><Icon name="clock" />Past reports</button>
+          </>}
+          {accessRole === "super_admin" && <>
+            <button className={`nav-item ${page === "Companies" ? "active" : ""}`} onClick={() => setPage("Companies")}><Icon name="users" />Companies</button>
+          </>}
           {accessRole === "admin" && <button className={`nav-item ${page === "Settings" ? "active" : ""}`} onClick={() => setPage("Settings")}><Icon name="settings" />Settings</button>}
         </nav>
         <div className="sidebar-bottom">
           <div className="help-card"><strong>Need a hand?</strong><p>We&apos;re here to make welcoming visitors a breeze.</p><a href="mailto:hello@tgmcheckin.com">Get in touch <Icon name="arrow" size={14} /></a></div>
-          <div className="profile"><div className="profile-avatar">{initials(accountDisplayName(session))}</div><span><strong>{accountDisplayName(session)}</strong><small>{hasSupabaseConfig ? accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
+          <div className="profile"><div className="profile-avatar">{initials(accountDisplayName(session))}</div><span><strong>{accountDisplayName(session)}</strong><small>{hasSupabaseConfig ? accessRole === "super_admin" ? "Super admin" : accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
         </div>
       </aside>
 
@@ -743,6 +758,8 @@ export default function Home() {
           </>}
 
           {page === "Past reports" && <PastReports />}
+
+          {page === "Companies" && accessRole === "super_admin" && <SuperAdminDashboard />}
 
           {page === "Settings" && accessRole === "admin" && <SettingsPanel configured={hasSupabaseConfig} companyName={companyName} onShowQr={() => setShowQr(true)} onSaveCompanyName={saveCompanyName} onHostsChanged={async () => { const hosts = await listEmployeeHosts(); setHostNames(hosts.map((host) => host.name)); }} />}
         </div>
@@ -885,6 +902,112 @@ function Todos() {
     {error && <p className="form-error directory-error" role="alert">{error}</p>}
     {loading ? <p className="directory-empty">Loading todos…</p> : !error && todos.length === 0 ? <p className="directory-empty">No todos found.</p> : <ul className="host-list">{todos.map((todo) => <li key={todo.id}><span><strong>{todo.name}</strong></span></li>)}</ul>}
   </section>;
+}
+
+function SuperAdminDashboard() {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [workspaceGuests, setWorkspaceGuests] = useState<Guest[]>([]);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    listAllWorkspaces().then((data) => {
+      setWorkspaces(data);
+      setError("");
+    }).catch((cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : "Unable to load companies.");
+    }).finally(() => {
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedWorkspace) {
+      setWorkspaceGuests([]);
+      return;
+    }
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    listGuestsByWorkspace(selectedWorkspace).then((data) => {
+      setWorkspaceGuests(data);
+    }).catch((cause: unknown) => {
+      setWorkspaceError(cause instanceof Error ? cause.message : "Unable to load company visitors.");
+    }).finally(() => {
+      setWorkspaceLoading(false);
+    });
+  }, [selectedWorkspace]);
+
+  const selectedCompany = workspaces.find((w) => w.owner_id === selectedWorkspace);
+  const stats = {
+    total: workspaceGuests.length,
+    checkedIn: workspaceGuests.filter((g) => g.status === "checked_in").length,
+    checkedOut: workspaceGuests.filter((g) => g.status === "checked_out").length,
+    pending: workspaceGuests.filter((g) => g.status === "pending_approval").length,
+  };
+
+  return <>
+    <section className="page-heading"><div><p className="eyebrow">SYSTEM ADMINISTRATION</p><h1>Company overview</h1><p className="heading-subtitle">Monitor visitor activity across all companies.</p></div></section>
+    <section className="panel past-reports">
+      <div className="past-reports-toolbar">
+        <label htmlFor="company-select">Select a company</label>
+        <select id="company-select" className="filter-select" value={selectedWorkspace ?? ""} onChange={(event) => setSelectedWorkspace(event.target.value || null)}>
+          <option value="">All companies</option>
+          {workspaces.map((workspace) => <option key={workspace.id} value={workspace.owner_id}>{workspace.company_name}</option>)}
+        </select>
+      </div>
+      {error && <p className="form-error past-reports-error" role="alert">{error}</p>}
+      {loading ? <p className="table-message"><span className="spinner" />Loading companies…</p>
+        : workspaces.length === 0 ? <p className="table-message">No companies registered yet.</p>
+          : <ul className="day-list">
+            {workspaces.map((workspace) => (
+              <li key={workspace.id} className={`day-row ${workspace.owner_id === selectedWorkspace ? "selected" : ""}`}>
+                <div className="day-date">
+                  <strong>{workspace.company_name}</strong>
+                  <small>{new Intl.DateTimeFormat("en", { year: "numeric", month: "short", day: "numeric" }).format(new Date(workspace.created_at))}</small>
+                </div>
+                <button type="button" className="secondary-button" onClick={() => setSelectedWorkspace(workspace.owner_id)}>View details</button>
+              </li>
+            ))}
+          </ul>}
+    </section>
+    {selectedWorkspace && selectedCompany && (
+      <section className="panel guest-panel">
+        <div className="guest-panel-heading">
+          <div>
+            <div className="title-with-count"><h2>{selectedCompany.company_name}</h2></div>
+            <p>Visitor activity overview</p>
+          </div>
+        </div>
+        {workspaceLoading ? <p className="table-message"><span className="spinner" />Loading visitors…</p>
+          : <><section className="stats-grid">
+            <StatCard label="Total visitors" value={stats.total} caption="All registered visits" icon="users" color="lavender" trend="Total" />
+            <StatCard label="Checked in" value={stats.checkedIn} caption="Currently on site" icon="check" color="mint" trend="On site" />
+            <StatCard label="Checked out" value={stats.checkedOut} caption="Completed visits" icon="clock" color="peach" trend="Completed" />
+          </section>
+          <div className="table-scroll"><table>
+            <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th></tr></thead>
+            <tbody>
+              {workspaceGuests.length === 0 ? <tr><td colSpan={6} className="table-message">No visitors recorded for this company.</td></tr>
+                : workspaceGuests.slice(0, 10).map((guest) => <tr key={guest.id}>
+                  <td><strong>{guest.name}</strong>{guest.email && <small>{guest.email}</small>}</td>
+                  <td>{guest.purpose}</td>
+                  <td className="company-cell">{guest.host_name}</td>
+                  <td className="company-cell">{guest.company || "—"}</td>
+                  <td><span className={`status-pill ${guest.status}`}><i /></span></td>
+                  <td>{guest.checked_in_at ? new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(guest.checked_in_at)) : "—"}</td>
+                </tr>)}
+            </tbody>
+          </table></div>
+          {workspaceGuests.length > 10 && <div className="table-footer"><span>Showing 10 of {workspaceGuests.length} visitors</span></div>}
+          </>}
+        {workspaceError && <p className="form-error past-reports-error" role="alert">{workspaceError}</p>}
+      </section>
+    )}
+  </>;
 }
 
 function ReceptionTeam({ configured }: { configured: boolean }) {

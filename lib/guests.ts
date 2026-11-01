@@ -34,7 +34,7 @@ export type NewGuest = {
   purpose: string;
 };
 export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
-export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" };
+export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" | "super_admin" };
 export type ReceptionMember = { user_id: string; email: string; created_at: string };
 
 const STORAGE_KEY = "tgm-check-in-visits";
@@ -577,3 +577,22 @@ export async function getReceptionCompanyName(receptionToken: string): Promise<s
   const workspace = await getReceptionWorkspace();
   return workspace.reception_token === receptionToken ? workspace.company_name : null;
 }
+
+export type Workspace = { id: string; owner_id: string; company_name: string; reception_token: string; created_at: string };
+
+export async function listAllWorkspaces(): Promise<Workspace[]> {
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.rpc("list_all_workspaces");
+  if (error) throw error;
+  return (data ?? []) as Workspace[];
+}
+
+export async function listGuestsByWorkspace(workspaceOwnerId: string): Promise<Guest[]> {
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.rpc("list_guests_by_workspace", { workspace_owner_id: workspaceOwnerId });
+  if (error) throw error;
+  return (data ?? []) as Guest[];
+}
+

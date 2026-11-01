@@ -1,0 +1,160 @@
+create table if not exists public.super_admins (
+  user_id uuid not null primary key references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.super_admins enable row level security;
+
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.super_admins
+    where user_id = auth.uid()
+  );
+$$;
+
+revoke all on function public.is_super_admin() from public;
+grant execute on function public.is_super_admin() to authenticated;
+
+create policy "Super admins can read all workspaces"
+  on public.workspaces for select
+  using (auth.uid() = owner_id or public.is_super_admin());
+
+create policy "Super admins can read all guests"
+  on public.guests for select
+  using (auth.uid() = owner_id or public.is_reception_member(owner_id) or public.is_super_admin());
+
+create policy "Super admins can read all employee hosts"
+  on public.employee_hosts for select
+  using (auth.uid() = owner_id or public.is_super_admin());
+
+create or replace function public.get_my_reception_access()
+returns table(company_name text, reception_token uuid, owner_id uuid, role text)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null then
+    raise exception 'Sign in to open the reception workspace.';
+  end if;
+
+  if public.is_super_admin() then
+    return query
+      select w.company_name, w.reception_token, w.owner_id, 'super_admin'::text
+      from public.workspaces as w
+      limit 1;
+    return;
+  end if;
+
+  if exists (
+    select 1 from public.workspaces as w where w.owner_id = current_user_id
+  ) then
+    return query
+      select w.company_name, w.reception_token, w.owner_id, 'admin'::text
+      from public.workspaces as w
+      where w.owner_id = current_user_id;
+    return;
+  end if;
+
+  if exists (
+    select 1
+    from public.workspace_reception_members as member
+    where member.user_id = current_user_id
+  ) then
+    return query
+      select w.company_name, w.reception_token, w.owner_id, 'reception'::text
+      from public.workspace_reception_members as member
+      join public.workspaces as w on w.owner_id = member.owner_id
+      where member.user_id = current_user_id
+      limit 1;
+    return;
+  end if;
+
+  insert into public.workspaces (owner_id)
+  values (current_user_id)
+  on conflict (owner_id) do nothing;
+
+  return query
+    select w.company_name, w.reception_token, w.owner_id, 'admin'::text
+    from public.workspaces as w
+    where w.owner_id = current_user_id;
+end;
+$$;
+
+create or replace function public.list_all_workspaces()
+returns table(id uuid, owner_id uuid, company_name text, reception_token uuid, created_at timestamptz)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null or not public.is_super_admin() then
+    raise exception 'Only super admins can view all workspaces.';
+  end if;
+
+  return query
+    select w.id, w.owner_id, w.company_name, w.reception_token, w.created_at
+    from public.workspaces as w
+    order by w.created_at desc;
+end;
+$$;
+
+revoke all on function public.list_all_workspaces() from public;
+grant execute on function public.list_all_workspaces() to authenticated;
+
+create or replace function public.list_guests_by_workspace(workspace_owner_id uuid)
+returns table(
+  id uuid,
+  owner_id uuid,
+  name text,
+  email text,
+  phone text,
+  company text,
+  host_name text,
+  host_id uuid,
+  purpose text,
+  status text,
+  checked_in_at timestamptz,
+  checked_out_at timestamptz,
+  checkout_method text,
+  host_notified_at timestamptz,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null then
+    raise exception 'Sign in to view guests.';
+  end if;
+
+  if current_user_id <> workspace_owner_id and not public.is_super_admin() then
+    raise exception 'You do not have permission to view this workspace.';
+  end if;
+
+  return query
+    select g.id, g.owner_id, g.name, g.email, g.phone, g.company, g.host_name, g.host_id,
+           g.purpose, g.status, g.checked_in_at, g.checked_out_at, g.checkout_method,
+           g.host_notified_at, g.created_at
+    from public.guests as g
+    where g.owner_id = workspace_owner_id
+    order by g.created_at desc;
+end;
+$$;
+
+revoke all on function public.list_guests_by_workspace(uuid) from public;
+grant execute on function public.list_guests_by_workspace(uuid) to authenticated;

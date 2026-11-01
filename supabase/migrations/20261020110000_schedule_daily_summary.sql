@@ -32,4 +32,5 @@ $$;
 revoke all on function public.trigger_daily_summary() from public, anon, authenticated;
 
 -- 16:00 UTC = 5:00 PM West Africa Time (UTC+1, no daylight saving).
-select cron.schedule('daily-visitor-summary', '0 16 * * *', $$select public.trigger_daily_summary()$$);
+-- Monday to Friday only (1-5, where 0=Sunday, 6=Saturday)
+select cron.schedule('daily-visitor-summary', '0 16 * * 1-5', $$select public.trigger_daily_summary()$$);
