@@ -1,3 +1,4 @@
+-- Developer role. Safe to re-run: the table and is_developer() were already applied by hand.
 create table if not exists public.developers (
   user_id uuid not null primary key references auth.users (id) on delete cascade,
   created_at timestamptz not null default now()
@@ -22,35 +23,44 @@ $$;
 revoke all on function public.is_developer() from public;
 grant execute on function public.is_developer() to authenticated;
 
+drop policy if exists "Developers can read all workspaces" on public.workspaces;
 create policy "Developers can read all workspaces"
   on public.workspaces for select
   using (auth.uid() = owner_id or public.is_super_admin() or public.is_developer());
 
+drop policy if exists "Developers can read all guests" on public.guests;
 create policy "Developers can read all guests"
   on public.guests for select
   using (auth.uid() = owner_id or public.is_reception_member(owner_id) or public.is_super_admin() or public.is_developer());
 
+drop policy if exists "Developers can read all employee hosts" on public.employee_hosts;
 create policy "Developers can read all employee hosts"
   on public.employee_hosts for select
   using (auth.uid() = owner_id or public.is_super_admin() or public.is_developer());
 
+-- Final version of the access function: super admin, then developer, then workspace owner,
+-- then reception member, then first sign-in creates a workspace.
 create or replace function public.get_my_reception_access()
 returns table(company_name text, reception_token uuid, owner_id uuid, role text)
 language plpgsql
 security definer
 set search_path = ''
 as $$
+#variable_conflict use_column
 declare
   current_user_id uuid := auth.uid();
+  signup_company_name text := nullif(btrim(auth.jwt() -> 'user_metadata' ->> 'company_name'), '');
 begin
   if current_user_id is null then
     raise exception 'Sign in to open the reception workspace.';
   end if;
 
   if public.is_super_admin() then
+    -- Prefer the account's own workspace; otherwise the oldest one, so the result is stable.
     return query
       select w.company_name, w.reception_token, w.owner_id, 'super_admin'::text
       from public.workspaces as w
+      order by (w.owner_id = current_user_id) desc, w.created_at
       limit 1;
     return;
   end if;
@@ -59,6 +69,7 @@ begin
     return query
       select w.company_name, w.reception_token, w.owner_id, 'developer'::text
       from public.workspaces as w
+      order by (w.owner_id = current_user_id) desc, w.created_at
       limit 1;
     return;
   end if;
@@ -87,8 +98,15 @@ begin
     return;
   end if;
 
-  insert into public.workspaces (owner_id)
-  values (current_user_id)
+  insert into public.workspaces (owner_id, company_name)
+  values (
+    current_user_id,
+    case
+      when signup_company_name is not null and char_length(signup_company_name) <= 120
+        then signup_company_name
+      else 'My company'
+    end
+  )
   on conflict (owner_id) do nothing;
 
   return query
@@ -104,10 +122,9 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-  current_user_id uuid := auth.uid();
+#variable_conflict use_column
 begin
-  if current_user_id is null or (not public.is_super_admin() and not public.is_developer()) then
+  if auth.uid() is null or not (public.is_super_admin() or public.is_developer()) then
     raise exception 'Only super admins and developers can view all workspaces.';
   end if;
 
@@ -143,14 +160,13 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-  current_user_id uuid := auth.uid();
+#variable_conflict use_column
 begin
-  if current_user_id is null then
+  if auth.uid() is null then
     raise exception 'Sign in to view guests.';
   end if;
 
-  if current_user_id <> workspace_owner_id and not public.is_super_admin() and not public.is_developer() then
+  if auth.uid() <> list_guests_by_workspace.workspace_owner_id and not (public.is_super_admin() or public.is_developer()) then
     raise exception 'You do not have permission to view this workspace.';
   end if;
 
@@ -159,7 +175,7 @@ begin
            g.purpose, g.status, g.checked_in_at, g.checked_out_at, g.checkout_method,
            g.host_notified_at, g.created_at
     from public.guests as g
-    where g.owner_id = workspace_owner_id
+    where g.owner_id = list_guests_by_workspace.workspace_owner_id
     order by g.created_at desc;
 end;
 $$;
