@@ -36,7 +36,7 @@ export type NewGuest = {
 export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
 export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" | "super_admin" | "developer" };
 export type ReceptionMember = { user_id: string; email: string; created_at: string };
-export type VisitorMessage = { id: string; guest_id: string; guest_name: string; message_type: "not_available" | "busy" | "need_time"; message: string; status: "pending" | "approved" | "rejected"; created_at: string };
+export type HostMessage = { id: string; host_id: string; host_name: string; message_type: "not_available" | "busy" | "need_time"; message: string; status: "pending" | "approved" | "rejected"; created_at: string };
 
 const STORAGE_KEY = "tgm-check-in-visits";
 const WORKSPACE_KEY = "tgm-check-in-workspace";
@@ -597,39 +597,35 @@ export async function listGuestsByWorkspace(workspaceOwnerId: string): Promise<G
   return (data ?? []) as Guest[];
 }
 
-export async function getPendingVisitorMessages(): Promise<VisitorMessage[]> {
+export async function getPendingHostMessages(): Promise<HostMessage[]> {
   const client = getSupabase();
   if (!client) return [];
-  const { data, error } = await client.rpc("get_pending_visitor_messages");
+  const { data, error } = await client.rpc("get_pending_host_messages");
   if (error) throw error;
-  return (data ?? []) as VisitorMessage[];
+  return (data ?? []) as HostMessage[];
 }
 
-export async function submitVisitorMessage(guestId: string, messageType: "not_available" | "busy" | "need_time", message: string): Promise<VisitorMessage> {
+export async function submitHostMessage(hostId: string, messageType: "not_available" | "busy" | "need_time", message: string): Promise<HostMessage> {
   const client = getSupabase();
-  if (!client) throw new Error("Visitor messages require a connected workspace.");
-  const { data, error } = await client
-    .from("visitor_messages")
-    .insert({ guest_id: guestId, message_type: messageType, message })
-    .select()
-    .single();
+  if (!client) throw new Error("Host messages require a connected workspace.");
+  const { data, error } = await client.rpc("submit_host_message", { host_id: hostId, message_type: messageType, message });
   if (error) throw error;
-  return data as VisitorMessage;
+  return data?.[0] as HostMessage;
 }
 
-export async function approveVisitorMessage(messageId: string): Promise<VisitorMessage> {
+export async function approveHostMessage(messageId: string): Promise<HostMessage> {
   const client = getSupabase();
   if (!client) throw new Error("Message approval requires authentication.");
-  const { data, error } = await client.rpc("approve_visitor_message", { message_id: messageId });
+  const { data, error } = await client.rpc("approve_host_message", { message_id: messageId });
   if (error) throw error;
-  return data?.[0] as VisitorMessage;
+  return data?.[0] as HostMessage;
 }
 
-export async function rejectVisitorMessage(messageId: string): Promise<VisitorMessage> {
+export async function rejectHostMessage(messageId: string): Promise<HostMessage> {
   const client = getSupabase();
   if (!client) throw new Error("Message rejection requires authentication.");
-  const { data, error } = await client.rpc("reject_visitor_message", { message_id: messageId });
+  const { data, error } = await client.rpc("reject_host_message", { message_id: messageId });
   if (error) throw error;
-  return data?.[0] as VisitorMessage;
+  return data?.[0] as HostMessage;
 }
 

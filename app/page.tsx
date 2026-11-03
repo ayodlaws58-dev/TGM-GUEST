@@ -9,9 +9,9 @@ import {
   addEmployeeHostsBulk,
   addGuest,
   approveDemoGuest,
-  approveVisitorMessage,
+  approveHostMessage,
   getReceptionWorkspace,
-  getPendingVisitorMessages,
+  getPendingHostMessages,
   getSupabase,
   hasSupabaseConfig,
   listAllWorkspaces,
@@ -20,7 +20,7 @@ import {
   listGuests,
   listReceptionHosts,
   listReceptionMembers,
-  rejectVisitorMessage,
+  rejectHostMessage,
   removeEmployeeHost,
   removeReceptionMember,
   inviteReceptionMember,
@@ -32,7 +32,7 @@ import {
   type GuestStatus,
   type VisitorReportPeriod,
   type Workspace,
-  type VisitorMessage,
+  type HostMessage,
 } from "../lib/guests";
 import HostSearch from "./components/HostSearch";
 import PastReports from "./components/PastReports";
@@ -159,7 +159,7 @@ export default function Home() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [sendingSummary, setSendingSummary] = useState(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [visitorMessages, setVisitorMessages] = useState<VisitorMessage[]>([]);
+  const [hostMessages, setHostMessages] = useState<HostMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [processingMessageId, setProcessingMessageId] = useState<string | null>(null);
@@ -244,10 +244,10 @@ export default function Home() {
 
   const refreshVisitorMessages = useCallback(async () => {
     try {
-      const messages = await getPendingVisitorMessages();
-      setVisitorMessages(messages);
+      const messages = await getPendingHostMessages();
+      setHostMessages(messages);
     } catch (cause) {
-      console.error("Unable to load visitor messages:", cause);
+      console.error("Unable to load host messages:", cause);
     }
   }, []);
 
@@ -584,11 +584,11 @@ export default function Home() {
     }
   }
 
-  async function handleApproveMessage(message: VisitorMessage) {
+  async function handleApproveMessage(message: HostMessage) {
     setProcessingMessageId(message.id);
     try {
-      await approveVisitorMessage(message.id);
-      setNotice(`Message from ${message.guest_name} approved. Notification will show every hour.`);
+      await approveHostMessage(message.id);
+      setNotice(`${message.host_name}'s availability update approved. Notification will show every hour.`);
       await refreshVisitorMessages();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to approve message.");
@@ -597,11 +597,11 @@ export default function Home() {
     }
   }
 
-  async function handleRejectMessage(message: VisitorMessage) {
+  async function handleRejectMessage(message: HostMessage) {
     setProcessingMessageId(message.id);
     try {
-      await rejectVisitorMessage(message.id);
-      setNotice(`Message from ${message.guest_name} rejected.`);
+      await rejectHostMessage(message.id);
+      setNotice(`${message.host_name}'s message rejected.`);
       await refreshVisitorMessages();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to reject message.");
@@ -748,7 +748,7 @@ export default function Home() {
             {!hasSupabaseConfig && <div className="demo-note"><span className="demo-note-icon">i</span><span>Demo mode: visitor check-ins are saved in this browser.</span><button onClick={() => setPage("Settings")}>Connect Supabase <Icon name="arrow" size={13} /></button></div>}
             {stats.pending > 0 && <button className="pending-banner" onClick={() => { setPage("Visitors"); setFilter("pending_approval"); }}><span>{stats.pending} visitor{stats.pending === 1 ? "" : "s"} waiting for approval</span><span>Review arrivals <Icon name="arrow" size={14} /></span></button>}
             <section className="reception-banner"><div className="reception-icon"><Icon name="qr" size={22} /></div><div className="reception-info"><span className="event-kicker">YOUR FRONT DESK CHECK-IN</span><h2>One QR for every visitor</h2><p>Display this code at reception. Visitors submit their details for admin approval.</p></div><button className="reception-cta" onClick={() => setShowQr(true)}>Show QR code <Icon name="arrow" size={14} /></button><div className="banner-decoration banner-decoration-one" /><div className="banner-decoration banner-decoration-two" /></section>
-            {visitorMessages.filter(m => m.status === "pending").length > 0 && <button className="pending-banner" onClick={() => setShowMessages(true)}><span>{visitorMessages.filter(m => m.status === "pending").length} visitor message{visitorMessages.filter(m => m.status === "pending").length === 1 ? "" : "s"} awaiting approval</span><span>Review messages <Icon name="arrow" size={14} /></span></button>}
+            {hostMessages.filter(m => m.status === "pending").length > 0 && <button className="pending-banner" onClick={() => setShowMessages(true)}><span>{hostMessages.filter(m => m.status === "pending").length} host availability update{hostMessages.filter(m => m.status === "pending").length === 1 ? "" : "s"} awaiting approval</span><span>Review updates <Icon name="arrow" size={14} /></span></button>}
             <section className="stats-grid" aria-label="Today's visitor statistics">
               <StatCard label="Visitors today" value={stats.total} caption="Approved visits today" icon="users" color="lavender" trend="Today" />
               <StatCard label="Currently on site" value={stats.onSite} caption="Visitors still in the office" icon="check" color="mint" trend="On site" />
@@ -822,7 +822,7 @@ export default function Home() {
 
       {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p>{receptionToken && isPrivateHost(getReceptionBase()) && <p className="form-error" role="alert">This code points to {getReceptionBase()}, which only works on this network. To work on Wi-Fi and mobile data, open the dashboard from your public https:// site address (or set NEXT_PUBLIC_SITE_URL) and download the code again.</p>}<button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
 
-      {showMessages && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowMessages(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="messages-title"><div className="modal-heading"><div><p className="eyebrow">VISITOR MESSAGES</p><h2 id="messages-title">Message requests</h2><p>Visitors requesting availability changes. Approve or reject each message.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowMessages(false)}><Icon name="close" /></button></div><div className="table-scroll"><table><thead><tr><th>VISITOR</th><th>MESSAGE TYPE</th><th>MESSAGE</th><th>RECEIVED</th><th aria-label="Actions" /></tr></thead><tbody>{visitorMessages.length === 0 ? <tr><td colSpan={5} className="table-message">No pending messages.</td></tr> : visitorMessages.map((message) => <tr key={message.id}><td><strong>{message.guest_name}</strong></td><td><span className={`status-pill ${message.message_type}`}>{message.message_type === "not_available" ? "Not available" : message.message_type === "busy" ? "Busy" : "Need time"}</span></td><td>{message.message}</td><td className="arrival-cell">{new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(message.created_at))}</td><td><div className="row-actions">{message.status === "pending" && <><button className="approve-action" disabled={processingMessageId === message.id} onClick={() => void handleApproveMessage(message)}>{processingMessageId === message.id ? "Processing…" : "Approve"}</button><button className="text-button" disabled={processingMessageId === message.id} onClick={() => void handleRejectMessage(message)}>Reject</button></> }{message.status === "approved" && <span className="status-pill"><i />Approved</span>}{message.status === "rejected" && <span className="status-pill"><i />Rejected</span>}</div></td></tr>)}</tbody></table></div></section></div>}
+      {showMessages && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowMessages(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="messages-title"><div className="modal-heading"><div><p className="eyebrow">HOST AVAILABILITY</p><h2 id="messages-title">Availability updates</h2><p>Review host availability updates. Approve or reject each request.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowMessages(false)}><Icon name="close" /></button></div><div className="table-scroll"><table><thead><tr><th>HOST</th><th>UPDATE TYPE</th><th>MESSAGE</th><th>REQUESTED</th><th aria-label="Actions" /></tr></thead><tbody>{hostMessages.length === 0 ? <tr><td colSpan={5} className="table-message">No pending updates.</td></tr> : hostMessages.map((message) => <tr key={message.id}><td><strong>{message.host_name}</strong></td><td><span className={`status-pill ${message.message_type}`}>{message.message_type === "not_available" ? "Not available" : message.message_type === "busy" ? "Busy" : "Need time"}</span></td><td>{message.message}</td><td className="arrival-cell">{new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(message.created_at))}</td><td><div className="row-actions">{message.status === "pending" && <><button className="approve-action" disabled={processingMessageId === message.id} onClick={() => void handleApproveMessage(message)}>{processingMessageId === message.id ? "Processing…" : "Approve"}</button><button className="text-button" disabled={processingMessageId === message.id} onClick={() => void handleRejectMessage(message)}>Reject</button></> }{message.status === "approved" && <span className="status-pill"><i />Approved</span>}{message.status === "rejected" && <span className="status-pill"><i />Rejected</span>}</div></td></tr>)}</tbody></table></div></section></div>}
     </div>
   );
 }
