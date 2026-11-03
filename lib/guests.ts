@@ -36,6 +36,7 @@ export type NewGuest = {
 export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
 export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" | "super_admin" | "developer" };
 export type ReceptionMember = { user_id: string; email: string; created_at: string };
+export type VisitorMessage = { id: string; guest_id: string; guest_name: string; message_type: "not_available" | "busy" | "need_time"; message: string; status: "pending" | "approved" | "rejected"; created_at: string };
 
 const STORAGE_KEY = "tgm-check-in-visits";
 const WORKSPACE_KEY = "tgm-check-in-workspace";
@@ -594,5 +595,41 @@ export async function listGuestsByWorkspace(workspaceOwnerId: string): Promise<G
   const { data, error } = await client.rpc("list_guests_by_workspace", { workspace_owner_id: workspaceOwnerId });
   if (error) throw error;
   return (data ?? []) as Guest[];
+}
+
+export async function getPendingVisitorMessages(): Promise<VisitorMessage[]> {
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.rpc("get_pending_visitor_messages");
+  if (error) throw error;
+  return (data ?? []) as VisitorMessage[];
+}
+
+export async function submitVisitorMessage(guestId: string, messageType: "not_available" | "busy" | "need_time", message: string): Promise<VisitorMessage> {
+  const client = getSupabase();
+  if (!client) throw new Error("Visitor messages require a connected workspace.");
+  const { data, error } = await client
+    .from("visitor_messages")
+    .insert({ guest_id: guestId, message_type: messageType, message })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as VisitorMessage;
+}
+
+export async function approveVisitorMessage(messageId: string): Promise<VisitorMessage> {
+  const client = getSupabase();
+  if (!client) throw new Error("Message approval requires authentication.");
+  const { data, error } = await client.rpc("approve_visitor_message", { message_id: messageId });
+  if (error) throw error;
+  return data?.[0] as VisitorMessage;
+}
+
+export async function rejectVisitorMessage(messageId: string): Promise<VisitorMessage> {
+  const client = getSupabase();
+  if (!client) throw new Error("Message rejection requires authentication.");
+  const { data, error } = await client.rpc("reject_visitor_message", { message_id: messageId });
+  if (error) throw error;
+  return data?.[0] as VisitorMessage;
 }
 
