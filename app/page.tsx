@@ -26,6 +26,7 @@ import {
   inviteReceptionMember,
   setGuestStatus,
   updateCompanyName,
+  updateWorkspaceCcEmails,
   VISIT_PURPOSES,
   type EmployeeHost,
   type Guest,
@@ -924,11 +925,148 @@ function SettingsPanel({ configured, companyName, onShowQr, onSaveCompanyName, o
       <div className="settings-divider" />
       <div className="connection-instructions"><h3>Reception QR code</h3><p>Visitors submit their details and select a host. They remain pending until an administrator approves them; approval checks them in and sends an email to the host.</p><button className="primary-button settings-qr-button" onClick={onShowQr}><Icon name="qr" size={16} /> Show reception QR code</button></div>
     </section>
+    {configured && <CcEmailManager />}
     <ReceptionTeam configured={configured} />
     <EmployeeDirectory configured={configured} onHostsChanged={onHostsChanged} />
     {configured && <Todos />}
     <section className="panel settings-card local-data-card"><div className="settings-heading"><span className="settings-status-icon local"><Icon name="users" size={20} /></span><div><h2>Daily visitor history</h2><p>Visitor log entries keep each office visit separate, including repeat visitors. The overview displays check-ins for today.</p></div></div></section>
   </>;
+}
+
+function Todos() {
+  const [todos, setTodos] = useState<{ id: string | number; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const client = getSupabase();
+    if (!client) {
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    client.from("todos").select().then(({ data, error: queryError }) => {
+      if (!active) return;
+      if (queryError) setError(queryError.message);
+      else setTodos((data ?? []) as { id: string | number; name: string }[]);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  return <section className="panel settings-card directory-card">
+    <div className="settings-heading"><span className="settings-status-icon"><Icon name="check" size={20} /></span><div><h2>Todos</h2><p>Test list loaded from the Supabase todos table.</p></div></div>
+    {error && <p className="form-error directory-error" role="alert">{error}</p>}
+    {loading ? <p className="directory-empty">Loading todos…</p> : !error && todos.length === 0 ? <p className="directory-empty">No todos found.</p> : <ul className="host-list">{todos.map((todo) => <li key={todo.id}><span><strong>{todo.name}</strong></span></li>)}</ul>}
+  </section>;
+}
+
+function CcEmailManager() {
+  const [ccEmails, setCcEmails] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function handleAddEmail() {
+    const email = newEmail.trim().toLowerCase();
+    if (!email) {
+      setError("Enter an email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (ccEmails.includes(email)) {
+      setError("This email is already in the CC list.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      await updateWorkspaceCcEmails([...ccEmails, email]);
+      setCcEmails([...ccEmails, email]);
+      setNewEmail("");
+      setNotice(`${email} added to CC list.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to add email.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRemoveEmail(emailToRemove: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const updated = ccEmails.filter(e => e !== emailToRemove);
+      await updateWorkspaceCcEmails(updated);
+      setCcEmails(updated);
+      setNotice(`${emailToRemove} removed from CC list.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to remove email.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // Load current CC emails from workspace - we'll fetch them when settings load
+    // For now, starting with empty array
+  }, []);
+
+  return <section className="panel settings-card directory-card">
+    <div className="settings-heading"><span className="settings-status-icon"><Icon name="settings" size={20} /></span><div><h2>Email CC Recipients</h2><p>Add email addresses to receive copies of visitor arrival and daily summary emails.</p></div></div>
+    <div style={{padding: "20px"}}>
+      <div style={{marginBottom: "20px"}}>
+        <label style={{display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "500"}}>Add new recipient email</label>
+        <div style={{display: "flex", gap: "8px"}}>
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="manager@company.com"
+            style={{flex: 1, padding: "8px 12px", border: "1px solid #ddd", borderRadius: "4px", fontSize: "14px"}}
+            disabled={loading}
+          />
+          <button
+            onClick={handleAddEmail}
+            disabled={loading}
+            style={{padding: "8px 16px", background: "#000", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "500", fontSize: "14px"}}
+          >
+            {loading ? "Adding…" : "Add"}
+          </button>
+        </div>
+      </div>
+
+      {error && <p style={{color: "#dc3545", fontSize: "14px", marginBottom: "12px"}}>{error}</p>}
+      {notice && <p style={{color: "#28a745", fontSize: "14px", marginBottom: "12px"}}>{notice}</p>}
+
+      <div>
+        <label style={{fontSize: "14px", fontWeight: "500", display: "block", marginBottom: "12px"}}>Current CC recipients</label>
+        {ccEmails.length === 0 ? (
+          <p style={{fontSize: "14px", color: "#666"}}>No CC recipients added yet.</p>
+        ) : (
+          <ul style={{listStyle: "none", padding: 0, margin: 0}}>
+            {ccEmails.map((email) => (
+              <li key={email} style={{display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: "#f5f5f5", borderRadius: "4px", marginBottom: "8px"}}>
+                <span style={{fontSize: "14px"}}>{email}</span>
+                <button
+                  onClick={() => handleRemoveEmail(email)}
+                  disabled={loading}
+                  style={{background: "none", border: "none", color: "#dc3545", cursor: "pointer", fontSize: "14px", textDecoration: "underline"}}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  </section>;
 }
 
 function Todos() {
