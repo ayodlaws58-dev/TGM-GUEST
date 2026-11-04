@@ -9,9 +9,10 @@ export async function sendWorkspaceSummary(options: {
   ownerId: string;
   companyName: string;
   to: string;
+  cc?: string[];
   idempotencyKey?: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { server, resend, from, ownerId, companyName, to, idempotencyKey } = options;
+  const { server, resend, from, ownerId, companyName, to, cc, idempotencyKey } = options;
   const watNow = new Date(Date.now() + WAT_OFFSET_MS);
   const dayStartUtc = Date.UTC(watNow.getUTCFullYear(), watNow.getUTCMonth(), watNow.getUTCDate()) - WAT_OFFSET_MS;
   const start = new Date(dayStartUtc).toISOString();
@@ -38,6 +39,7 @@ export async function sendWorkspaceSummary(options: {
   const { error: sendError } = await resend.emails.send({
     from,
     to: [to],
+    cc: cc && cc.length > 0 ? cc : undefined,
     subject: `${companyName} visitor summary for ${dateLabel}`,
     text: [
       `Daily visitor summary for ${companyName} (${dateLabel}, West Africa Time)`,

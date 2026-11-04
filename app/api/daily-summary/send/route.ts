@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   // Only the workspace owner (admin) may send; reception members have no workspace row of their own.
   const { data: workspace, error: workspaceError } = await server
     .from("workspaces")
-    .select("owner_id, company_name")
+    .select("owner_id, company_name, cc_emails")
     .eq("owner_id", userData.user.id)
     .maybeSingle();
   if (workspaceError) return jsonError("Unable to load your workspace.", 500);
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     ownerId: workspace.owner_id,
     companyName: workspace.company_name,
     to: userData.user.email,
+    cc: workspace.cc_emails && workspace.cc_emails.length > 0 ? workspace.cc_emails : undefined,
   });
   if (!result.ok) return jsonError(result.error, 502);
   return NextResponse.json({ sent: true, to: userData.user.email });

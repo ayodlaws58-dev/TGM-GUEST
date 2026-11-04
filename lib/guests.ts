@@ -629,3 +629,11 @@ export async function rejectHostMessage(messageId: string): Promise<HostMessage>
   return data?.[0] as HostMessage;
 }
 
+export async function updateWorkspaceCcEmails(ccEmails: string[]): Promise<{ company_name: string; cc_emails: string[] }> {
+  const client = getSupabase();
+  if (!client) throw new Error("Email settings require a connected workspace.");
+  const { data, error } = await client.rpc("update_workspace_cc_emails", { cc_emails: ccEmails });
+  if (error) throw error;
+  return data?.[0] as { company_name: string; cc_emails: string[] };
+}
+
