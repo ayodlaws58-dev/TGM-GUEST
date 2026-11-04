@@ -97,13 +97,13 @@ export function renderHostCheckInEmail(data: HostCheckInEmailData) {
           <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin:20px 0;">
             <tr>
               <td style="padding:0 8px 0 0;width:33%;">
-                ${data.responseYesUrl ? `<a href="${esc(data.responseYesUrl)}" style="display:inline-block;width:100%;padding:12px 16px;background-color:#000000;color:#ffffff;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;">Yes, I can meet</a>` : '<span style="display:inline-block;width:100%;padding:12px 16px;background-color:#cccccc;color:#666666;border-radius:4px;font-weight:500;font-size:14px;text-align:center;">Yes, I can meet</span>'}
+                <a href="#" style="display:inline-block;width:100%;padding:12px 16px;background-color:#000000;color:#ffffff;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;cursor:pointer;" onclick="return false;">Yes, I can meet</a>
               </td>
               <td style="padding:0 4px;width:33%;">
-                ${data.responseMaybeUrl ? `<a href="${esc(data.responseMaybeUrl)}" style="display:inline-block;width:100%;padding:12px 16px;background-color:#ffffff;color:#000000;border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;">Maybe, running late</a>` : '<span style="display:inline-block;width:100%;padding:12px 16px;background-color:#f0f0f0;color:#666666;border:1px solid #cccccc;border-radius:4px;font-weight:500;font-size:14px;text-align:center;box-sizing:border-box;">Maybe, running late</span>'}
+                <a href="#" style="display:inline-block;width:100%;padding:12px 16px;background-color:#ffffff;color:#000000;border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;cursor:pointer;" onclick="return false;">Maybe, running late</a>
               </td>
               <td style="padding:0 0 0 4px;width:33%;">
-                ${data.responseNoUrl ? `<a href="${esc(data.responseNoUrl)}" style="display:inline-block;width:100%;padding:12px 16px;background-color:#ffffff;color:#000000;border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;">No, I can't</a>` : '<span style="display:inline-block;width:100%;padding:12px 16px;background-color:#f0f0f0;color:#666666;border:1px solid #cccccc;border-radius:4px;font-weight:500;font-size:14px;text-align:center;box-sizing:border-box;">No, I can\'t</span>'}
+                <a href="#" style="display:inline-block;width:100%;padding:12px 16px;background-color:#ffffff;color:#000000;border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;cursor:pointer;" onclick="return false;">No, I can't</a>
               </td>
             </tr>
           </table>
