@@ -986,12 +986,16 @@ function CcEmailManager() {
     setLoading(true);
     setError("");
     try {
-      await updateWorkspaceCcEmails([...ccEmails, email]);
-      setCcEmails([...ccEmails, email]);
+      const updated = [...ccEmails, email];
+      console.log("Updating CC emails:", updated);
+      await updateWorkspaceCcEmails(updated);
+      setCcEmails(updated);
       setNewEmail("");
       setNotice(`${email} added to CC list.`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to add email.");
+      const errorMsg = cause instanceof Error ? cause.message : "Unable to add email.";
+      console.error("CC email error:", errorMsg, cause);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -1013,8 +1017,21 @@ function CcEmailManager() {
   }
 
   useEffect(() => {
-    // Load current CC emails from workspace - we'll fetch them when settings load
-    // For now, starting with empty array
+    async function loadCcEmails() {
+      try {
+        const client = getSupabase();
+        if (!client) return;
+        // Try to use RPC function to get CC emails
+        const { data, error } = await client.rpc("get_workspace_cc_emails");
+        if (!error && data?.cc_emails && Array.isArray(data.cc_emails)) {
+          setCcEmails(data.cc_emails);
+        }
+      } catch (e) {
+        // Silently fail - will be populated when user adds an email
+        console.log("Could not load CC emails, will try after adding");
+      }
+    }
+    loadCcEmails();
   }, []);
 
   return <section className="panel settings-card directory-card">
@@ -1066,34 +1083,6 @@ function CcEmailManager() {
         )}
       </div>
     </div>
-  </section>;
-}
-
-function Todos() {
-  const [todos, setTodos] = useState<{ id: string | number; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const client = getSupabase();
-    if (!client) {
-      setLoading(false);
-      return;
-    }
-    let active = true;
-    client.from("todos").select().then(({ data, error: queryError }) => {
-      if (!active) return;
-      if (queryError) setError(queryError.message);
-      else setTodos((data ?? []) as { id: string | number; name: string }[]);
-      setLoading(false);
-    });
-    return () => { active = false; };
-  }, []);
-
-  return <section className="panel settings-card directory-card">
-    <div className="settings-heading"><span className="settings-status-icon"><Icon name="check" size={20} /></span><div><h2>Todos</h2><p>Test list loaded from the Supabase todos table.</p></div></div>
-    {error && <p className="form-error directory-error" role="alert">{error}</p>}
-    {loading ? <p className="directory-empty">Loading todos…</p> : !error && todos.length === 0 ? <p className="directory-empty">No todos found.</p> : <ul className="host-list">{todos.map((todo) => <li key={todo.id}><span><strong>{todo.name}</strong></span></li>)}</ul>}
   </section>;
 }
 

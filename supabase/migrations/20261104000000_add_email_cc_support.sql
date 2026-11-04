@@ -27,5 +27,30 @@ begin
 end;
 $$;
 
+create or replace function public.get_workspace_cc_emails()
+returns table(
+  company_name text,
+  cc_emails text[]
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null then
+    raise exception 'Sign in to view workspace settings.';
+  end if;
+
+  return query
+    select w.company_name, w.cc_emails
+    from public.workspaces as w
+    where w.owner_id = current_user_id;
+end;
+$$;
+
 revoke all on function public.update_workspace_cc_emails(text[]) from public;
+revoke all on function public.get_workspace_cc_emails() from public;
 grant execute on function public.update_workspace_cc_emails(text[]) to authenticated;
+grant execute on function public.get_workspace_cc_emails() to authenticated;

@@ -632,8 +632,16 @@ export async function rejectHostMessage(messageId: string): Promise<HostMessage>
 export async function updateWorkspaceCcEmails(ccEmails: string[]): Promise<{ company_name: string; cc_emails: string[] }> {
   const client = getSupabase();
   if (!client) throw new Error("Email settings require a connected workspace.");
-  const { data, error } = await client.rpc("update_workspace_cc_emails", { cc_emails: ccEmails });
-  if (error) throw error;
-  return data?.[0] as { company_name: string; cc_emails: string[] };
+  try {
+    const { data, error } = await client.rpc("update_workspace_cc_emails", { cc_emails: ccEmails });
+    if (error) {
+      console.error("CC email update error:", error);
+      throw new Error(error.message || "Unable to update CC email settings.");
+    }
+    return data?.[0] as { company_name: string; cc_emails: string[] };
+  } catch (e) {
+    console.error("RPC call failed:", e);
+    throw e;
+  }
 }
 
