@@ -12,6 +12,7 @@ import {
   approveHostMessage,
   getReceptionWorkspace,
   getPendingHostMessages,
+  getWorkspaceCcEmails,
   getSupabase,
   hasSupabaseConfig,
   listAllWorkspaces,
@@ -963,12 +964,18 @@ function Todos() {
 
 function CcEmailManager() {
   const [ccEmails, setCcEmails] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   async function handleAddEmail() {
+    // Never save before the saved list has loaded: it would replace the list with just this address.
+    if (!loaded) {
+      setError("Still loading your CC list. Please try again in a moment.");
+      return;
+    }
     const email = newEmail.trim().toLowerCase();
     if (!email) {
       setError("Enter an email address.");
@@ -1002,6 +1009,7 @@ function CcEmailManager() {
   }
 
   async function handleRemoveEmail(emailToRemove: string) {
+    if (!loaded) return;
     setLoading(true);
     setError("");
     try {
@@ -1017,7 +1025,15 @@ function CcEmailManager() {
   }
 
   useEffect(() => {
-    // Skip loading - will populate when user adds/removes emails via RPC
+    let active = true;
+    getWorkspaceCcEmails().then((emails) => {
+      if (!active) return;
+      setCcEmails(emails);
+      setLoaded(true);
+    }).catch((cause: unknown) => {
+      if (active) setError(cause instanceof Error ? `Unable to load your CC list: ${cause.message}` : "Unable to load your CC list.");
+    });
+    return () => { active = false; };
   }, []);
 
   return <section className="panel settings-card directory-card">
@@ -1032,11 +1048,11 @@ function CcEmailManager() {
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="manager@company.com"
             style={{flex: 1, padding: "8px 12px", border: "1px solid #ddd", borderRadius: "4px", fontSize: "14px"}}
-            disabled={loading}
+            disabled={loading || !loaded}
           />
           <button
             onClick={handleAddEmail}
-            disabled={loading}
+            disabled={loading || !loaded}
             style={{padding: "8px 16px", background: "#000", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "500", fontSize: "14px"}}
           >
             {loading ? "Adding…" : "Add"}
@@ -1049,7 +1065,9 @@ function CcEmailManager() {
 
       <div>
         <label style={{fontSize: "14px", fontWeight: "500", display: "block", marginBottom: "12px"}}>Current CC recipients</label>
-        {ccEmails.length === 0 ? (
+        {!loaded && !error ? (
+          <p style={{fontSize: "14px", color: "#666"}}>Loading your CC recipients…</p>
+        ) : ccEmails.length === 0 ? (
           <p style={{fontSize: "14px", color: "#666"}}>No CC recipients added yet.</p>
         ) : (
           <ul style={{listStyle: "none", padding: 0, margin: 0}}>
