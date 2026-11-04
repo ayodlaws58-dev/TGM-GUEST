@@ -2,30 +2,8 @@
 alter table public.workspaces add column if not exists cc_emails text[] default '{}';
 
 -- Add functions to manage CC emails
-create or replace function public.update_workspace_cc_emails(cc_emails text[])
-returns table(
-  id uuid,
-  company_name text,
-  cc_emails text[]
-)
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  current_user_id uuid := auth.uid();
-begin
-  if current_user_id is null then
-    raise exception 'Sign in to update workspace settings.';
-  end if;
-
-  return query
-    update public.workspaces
-    set cc_emails = $1
-    where owner_id = current_user_id
-    returning id, company_name, cc_emails;
-end;
-$$;
+-- update_workspace_cc_emails is defined in 20261104000001 (this version could not be created:
+-- the argument and the output column were both named cc_emails).
 
 create or replace function public.get_workspace_cc_emails()
 returns table(
@@ -50,7 +28,5 @@ begin
 end;
 $$;
 
-revoke all on function public.update_workspace_cc_emails(text[]) from public;
 revoke all on function public.get_workspace_cc_emails() from public;
-grant execute on function public.update_workspace_cc_emails(text[]) to authenticated;
 grant execute on function public.get_workspace_cc_emails() to authenticated;
