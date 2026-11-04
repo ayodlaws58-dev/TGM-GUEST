@@ -94,7 +94,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const companyResult = await client
     .from("workspaces")
-    .select("company_name")
+    .select("company_name, cc_emails")
     .eq("owner_id", visitor.owner_id)
     .single();
   if (companyResult.error) return jsonError(`Visitor approved, but the company name could not be loaded: ${companyResult.error.message}`, 500);
@@ -103,6 +103,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { error: emailError } = await resend.emails.send({
     from: resendFromEmail,
     to: [host.email],
+    cc: companyResult.data?.cc_emails && companyResult.data.cc_emails.length > 0 ? companyResult.data.cc_emails : undefined,
     subject: `${visitor.name} has arrived at ${companyResult.data.company_name}`,
     text: [
       `Hello ${host.name},`,
