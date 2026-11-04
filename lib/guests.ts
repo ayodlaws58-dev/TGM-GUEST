@@ -632,6 +632,7 @@ export async function rejectHostMessage(messageId: string): Promise<HostMessage>
 export async function updateWorkspaceCcEmails(ccEmails: string[]): Promise<{ company_name: string; cc_emails: string[] }> {
   const client = getSupabase();
   if (!client) throw new Error("Email settings require a connected workspace.");
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error("Supabase configuration missing.");
 
   // Get auth token
   const { data: { session }, error: sessionError } = await client.auth.getSession();
@@ -640,13 +641,15 @@ export async function updateWorkspaceCcEmails(ccEmails: string[]): Promise<{ com
   }
 
   // Call RPC via HTTP to bypass schema cache
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${session.access_token}`,
+    "apikey": supabaseAnonKey,
+  };
+
   const response = await fetch(`${supabaseUrl}/rest/v1/rpc/update_workspace_cc_emails`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${session.access_token}`,
-      "apikey": supabaseAnonKey,
-    },
+    headers,
     body: JSON.stringify({ cc_emails: ccEmails }),
   });
 
