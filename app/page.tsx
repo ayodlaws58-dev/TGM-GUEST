@@ -988,8 +988,8 @@ function CcEmailManager() {
     try {
       const updated = [...ccEmails, email];
       console.log("Updating CC emails:", updated);
-      await updateWorkspaceCcEmails(updated);
-      setCcEmails(updated);
+      const result = await updateWorkspaceCcEmails(updated);
+      setCcEmails(result.cc_emails || updated);
       setNewEmail("");
       setNotice(`${email} added to CC list.`);
     } catch (cause) {
@@ -1006,8 +1006,8 @@ function CcEmailManager() {
     setError("");
     try {
       const updated = ccEmails.filter(e => e !== emailToRemove);
-      await updateWorkspaceCcEmails(updated);
-      setCcEmails(updated);
+      const result = await updateWorkspaceCcEmails(updated);
+      setCcEmails(result.cc_emails || updated);
       setNotice(`${emailToRemove} removed from CC list.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to remove email.");
@@ -1017,21 +1017,7 @@ function CcEmailManager() {
   }
 
   useEffect(() => {
-    async function loadCcEmails() {
-      try {
-        const client = getSupabase();
-        if (!client) return;
-        // Try to use RPC function to get CC emails
-        const { data, error } = await client.rpc("get_workspace_cc_emails");
-        if (!error && data?.cc_emails && Array.isArray(data.cc_emails)) {
-          setCcEmails(data.cc_emails);
-        }
-      } catch (e) {
-        // Silently fail - will be populated when user adds an email
-        console.log("Could not load CC emails, will try after adding");
-      }
-    }
-    loadCcEmails();
+    // Skip loading - will populate when user adds/removes emails via RPC
   }, []);
 
   return <section className="panel settings-card directory-card">
