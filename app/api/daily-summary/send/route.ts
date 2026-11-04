@@ -30,11 +30,26 @@ export async function POST(request: Request) {
   // Only the workspace owner (admin) may send; reception members have no workspace row of their own.
   const { data: workspace, error: workspaceError } = await server
     .from("workspaces")
-    .select("owner_id, company_name, cc_emails")
+    .select("owner_id, company_name")
     .eq("owner_id", userData.user.id)
     .maybeSingle();
   if (workspaceError) return jsonError("Unable to load your workspace.", 500);
   if (!workspace) return jsonError("Only workspace administrators can send the summary.", 403);
+
+  // Try to get CC emails if the field exists
+  let ccEmails: string[] | undefined;
+  try {
+    const ccResult = await server
+      .from("workspaces")
+      .select("cc_emails")
+      .eq("owner_id", userData.user.id)
+      .single();
+    if (!ccResult.error && ccResult.data?.cc_emails && Array.isArray(ccResult.data.cc_emails) && ccResult.data.cc_emails.length > 0) {
+      ccEmails = ccResult.data.cc_emails;
+    }
+  } catch (e) {
+    // cc_emails field might not exist yet, continue without it
+  }
 
   const result = await sendWorkspaceSummary({
     server,
@@ -43,7 +58,7 @@ export async function POST(request: Request) {
     ownerId: workspace.owner_id,
     companyName: workspace.company_name,
     to: userData.user.email,
-    cc: workspace.cc_emails && workspace.cc_emails.length > 0 ? workspace.cc_emails : undefined,
+    cc: ccEmails,
   });
   if (!result.ok) return jsonError(result.error, 502);
   return NextResponse.json({ sent: true, to: userData.user.email });
