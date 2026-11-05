@@ -1,11 +1,12 @@
--- Mirrors the fix that was applied directly to Supabase on 2026-11-04 (recorded there as
--- 20261104214526 fix_update_workspace_cc_emails) so the repo matches the database.
+-- Mirrors what is live in Supabase so the repo matches the database.
+-- (Applied directly: 20261104214526 fix_update_workspace_cc_emails, then renamed the argument to p_cc_emails
+-- as rename_cc_emails_argument_to_p_cc_emails.)
 --
--- The argument is named cc_emails (not p_cc_emails): the app calls this function by argument name.
--- Entries are trimmed, lower-cased, de-duplicated and validated; at most 20 recipients.
+-- The app calls this function BY ARGUMENT NAME (p_cc_emails, see updateWorkspaceCcEmails in lib/guests.ts), so
+-- the two must agree. Entries are trimmed, lower-cased, de-duplicated and validated; at most 20 recipients.
 drop function if exists public.update_workspace_cc_emails(text[]);
 
-create function public.update_workspace_cc_emails(cc_emails text[])
+create function public.update_workspace_cc_emails(p_cc_emails text[])
 returns setof public.workspaces
 language plpgsql
 security definer
@@ -25,7 +26,7 @@ begin
     into cleaned
   from (
     select lower(btrim(t.entry)) as addr, min(t.position) as first_position
-    from unnest(coalesce(update_workspace_cc_emails.cc_emails, '{}')) with ordinality as t(entry, position)
+    from unnest(coalesce(p_cc_emails, '{}')) with ordinality as t(entry, position)
     where btrim(t.entry) <> ''
     group by lower(btrim(t.entry))
   ) as s;
