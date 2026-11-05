@@ -26,6 +26,7 @@ import {
   inviteReceptionMember,
   setGuestStatus,
   updateCompanyName,
+  getWorkspaceCcEmails,
   updateWorkspaceCcEmails,
   VISIT_PURPOSES,
   type EmployeeHost,
@@ -967,6 +968,32 @@ function CcEmailManager() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The saved list is loaded when the page opens. Until it has loaded, adding or removing is disabled so an
+  // empty list can never be saved over the real one.
+  const [listState, setListState] = useState<"loading" | "ready" | "failed" | "not-owner">("loading");
+
+  const loadSavedList = useCallback(async () => {
+    setListState("loading");
+    setError("");
+    try {
+      const saved = await getWorkspaceCcEmails();
+      if (saved === null) {
+        setListState("not-owner");
+        return;
+      }
+      setCcEmails(saved);
+      setListState("ready");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to load the CC list.");
+      setListState("failed");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSavedList();
+  }, [loadSavedList]);
+
+  const editable = listState === "ready" && !loading;
 
   async function handleAddEmail() {
     const email = newEmail.trim().toLowerCase();
@@ -987,7 +1014,6 @@ function CcEmailManager() {
     setError("");
     try {
       const updated = [...ccEmails, email];
-      console.log("Updating CC emails:", updated);
       const result = await updateWorkspaceCcEmails(updated);
       setCcEmails(result.cc_emails || updated);
       setNewEmail("");
@@ -1016,10 +1042,6 @@ function CcEmailManager() {
     }
   }
 
-  useEffect(() => {
-    // Skip loading - will populate when user adds/removes emails via RPC
-  }, []);
-
   return <section className="panel settings-card directory-card">
     <div className="settings-heading"><span className="settings-status-icon"><Icon name="settings" size={20} /></span><div><h2>Email CC Recipients</h2><p>Add email addresses to receive copies of visitor arrival and daily summary emails.</p></div></div>
     <div style={{padding: "20px"}}>
@@ -1032,11 +1054,11 @@ function CcEmailManager() {
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="manager@company.com"
             style={{flex: 1, padding: "8px 12px", border: "1px solid #ddd", borderRadius: "4px", fontSize: "14px"}}
-            disabled={loading}
+            disabled={!editable}
           />
           <button
             onClick={handleAddEmail}
-            disabled={loading}
+            disabled={!editable}
             style={{padding: "8px 16px", background: "#000", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "500", fontSize: "14px"}}
           >
             {loading ? "Adding…" : "Add"}
@@ -1049,7 +1071,13 @@ function CcEmailManager() {
 
       <div>
         <label style={{fontSize: "14px", fontWeight: "500", display: "block", marginBottom: "12px"}}>Current CC recipients</label>
-        {ccEmails.length === 0 ? (
+        {listState === "loading" ? (
+          <p style={{fontSize: "14px", color: "#666"}}>Loading your saved CC recipients…</p>
+        ) : listState === "failed" ? (
+          <p style={{fontSize: "14px", color: "#666"}}>Your saved list couldn&apos;t be loaded, so it can&apos;t be edited right now. <button type="button" onClick={() => void loadSavedList()} style={{background: "none", border: "none", color: "#000", cursor: "pointer", fontSize: "14px", textDecoration: "underline", padding: 0}}>Try again</button></p>
+        ) : listState === "not-owner" ? (
+          <p style={{fontSize: "14px", color: "#666"}}>The CC list is managed by the workspace owner.</p>
+        ) : ccEmails.length === 0 ? (
           <p style={{fontSize: "14px", color: "#666"}}>No CC recipients added yet.</p>
         ) : (
           <ul style={{listStyle: "none", padding: 0, margin: 0}}>
@@ -1058,7 +1086,7 @@ function CcEmailManager() {
                 <span style={{fontSize: "14px"}}>{email}</span>
                 <button
                   onClick={() => handleRemoveEmail(email)}
-                  disabled={loading}
+                  disabled={!editable}
                   style={{background: "none", border: "none", color: "#dc3545", cursor: "pointer", fontSize: "14px", textDecoration: "underline"}}
                 >
                   Remove
