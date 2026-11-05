@@ -650,7 +650,7 @@ export async function updateWorkspaceCcEmails(ccEmails: string[]): Promise<{ com
   const response = await fetch(`${supabaseUrl}/rest/v1/rpc/update_workspace_cc_emails`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ cc_emails: ccEmails }),
+    body: JSON.stringify({ p_cc_emails: ccEmails }),
   });
 
   if (!response.ok) {

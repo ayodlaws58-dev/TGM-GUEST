@@ -2,7 +2,7 @@
 alter table public.workspaces add column if not exists cc_emails text[] default '{}';
 
 -- Add functions to manage CC emails
-create or replace function public.update_workspace_cc_emails(cc_emails text[])
+create or replace function public.update_workspace_cc_emails(p_cc_emails text[])
 returns table(
   id uuid,
   company_name text,
@@ -21,7 +21,7 @@ begin
 
   return query
     update public.workspaces
-    set cc_emails = $1
+    set cc_emails = p_cc_emails
     where owner_id = current_user_id
     returning id, company_name, cc_emails;
 end;
