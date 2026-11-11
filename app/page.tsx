@@ -37,6 +37,7 @@ import {
 } from "../lib/guests";
 import HostSearch from "./components/HostSearch";
 import PastReports from "./components/PastReports";
+import { getTheme, applyThemeToDocument, getCurrentSeason } from "../lib/seasonal-themes";
 
 type IconName = "grid" | "users" | "chart" | "settings" | "search" | "plus" | "arrow" | "check" | "clock" | "close" | "download" | "logout" | "qr";
 
@@ -164,6 +165,13 @@ export default function Home() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [processingMessageId, setProcessingMessageId] = useState<string | null>(null);
+
+  // Apply seasonal theme on mount
+  useEffect(() => {
+    const currentSeason = getCurrentSeason();
+    const theme = getTheme(currentSeason);
+    applyThemeToDocument(theme);
+  }, []);
 
   useEffect(() => {
     const updateGreeting = () => setGreeting(timeGreeting(new Date()));
