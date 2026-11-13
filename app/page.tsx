@@ -171,6 +171,204 @@ export default function Home() {
     const currentSeason = getCurrentSeason();
     const theme = getTheme(currentSeason);
     applyThemeToDocument(theme);
+
+    // Add Christmas decorations throughout the page
+    if (currentSeason === "christmas") {
+      // Apply Christmas colors to page elements
+      const applyChristmasColors = () => {
+        // Change body and main backgrounds
+        document.body.style.background = "linear-gradient(135deg, #0B6623 0%, #C41E3A 50%, #0B6623 100%)";
+
+        const mainPanel = document.querySelector(".main-panel") as HTMLElement;
+        if (mainPanel) {
+          mainPanel.style.background = "linear-gradient(135deg, rgba(11, 102, 35, 0.1) 0%, rgba(196, 30, 58, 0.1) 100%)";
+        }
+
+        // Change content background
+        const content = document.querySelector(".content") as HTMLElement;
+        if (content) {
+          content.style.background = "rgba(255, 255, 255, 0.95)";
+        }
+
+        // Change sidebar
+        const sidebar = document.querySelector(".sidebar") as HTMLElement;
+        if (sidebar) {
+          sidebar.style.background = "linear-gradient(180deg, #0B6623 0%, #1a8c3a 100%)";
+          sidebar.style.color = "#fff";
+        }
+
+        // Change topbar
+        const topbar = document.querySelector(".topbar") as HTMLElement;
+        if (topbar) {
+          topbar.style.background = "linear-gradient(90deg, #C41E3A 0%, #0B6623 100%)";
+          topbar.style.borderBottom = "4px solid #FFD700";
+        }
+
+        // Change nav items
+        const navItems = document.querySelectorAll(".nav-item");
+        navItems.forEach((item) => {
+          (item as HTMLElement).style.color = "#fff";
+          item.addEventListener("mouseenter", () => {
+            (item as HTMLElement).style.background = "#FFD700";
+            (item as HTMLElement).style.color = "#0B6623";
+          });
+          item.addEventListener("mouseleave", () => {
+            (item as HTMLElement).style.background = "transparent";
+            (item as HTMLElement).style.color = "#fff";
+          });
+        });
+
+        // Change brand mark
+        const brandMark = document.querySelector(".brand-mark") as HTMLElement;
+        if (brandMark) {
+          brandMark.style.background = "#C41E3A";
+          brandMark.style.color = "#FFD700";
+        }
+
+        // Change buttons
+        const primaryButtons = document.querySelectorAll(".primary-button");
+        primaryButtons.forEach((btn) => {
+          (btn as HTMLElement).style.background = "#C41E3A";
+          (btn as HTMLElement).style.borderColor = "#C41E3A";
+          (btn as HTMLElement).style.color = "#fff";
+        });
+
+        // Change panels
+        const panels = document.querySelectorAll(".panel");
+        panels.forEach((panel) => {
+          (panel as HTMLElement).style.background = "#fff";
+          (panel as HTMLElement).style.borderTop = "4px solid #C41E3A";
+          (panel as HTMLElement).style.borderLeft = "3px solid #0B6623";
+        });
+      };
+
+      applyChristmasColors();
+      setTimeout(applyChristmasColors, 100);
+      setTimeout(applyChristmasColors, 500);
+
+      // Add animated GIF decorations to sidebar
+      const addSidebarDecorations = () => {
+        const sidebar = document.querySelector(".sidebar") as HTMLElement;
+        if (sidebar && !sidebar.querySelector("[data-christmas-sidebar-gif]")) {
+          // Create a decoration container
+          const decorContainer = document.createElement("div");
+          decorContainer.setAttribute("data-christmas-sidebar-gif", "container");
+          decorContainer.style.cssText = `
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 24px;
+            padding: 16px;
+            border-top: 2px solid #FFD700;
+            border-bottom: 2px solid #FFD700;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 8px;
+          `;
+
+          // Add Christmas tree GIF
+          const gifTree = document.createElement("img");
+          gifTree.setAttribute("data-christmas-sidebar-gif", "tree");
+          gifTree.src = "https://media.giphy.com/media/xT9IgEx8SbQ0teblUw/giphy.gif";
+          gifTree.alt = "Christmas Tree";
+          gifTree.style.cssText = `
+            width: 70px;
+            height: 70px;
+            border-radius: 8px;
+            object-fit: cover;
+            opacity: 1;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          `;
+          gifTree.onerror = () => {
+            gifTree.style.fontSize = "60px";
+            gifTree.textContent = "🎄";
+            gifTree.style.width = "auto";
+            gifTree.style.height = "auto";
+          };
+
+          // Add Santa GIF
+          const gifSanta = document.createElement("img");
+          gifSanta.setAttribute("data-christmas-sidebar-gif", "santa");
+          gifSanta.src = "https://media.giphy.com/media/2xPGkW6ybbqnOer1s9q/giphy.gif";
+          gifSanta.alt = "Santa";
+          gifSanta.style.cssText = `
+            width: 70px;
+            height: 70px;
+            border-radius: 8px;
+            object-fit: cover;
+            opacity: 1;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          `;
+          gifSanta.onerror = () => {
+            gifSanta.style.fontSize = "60px";
+            gifSanta.textContent = "🎅";
+            gifSanta.style.width = "auto";
+            gifSanta.style.height = "auto";
+          };
+
+          decorContainer.appendChild(gifTree);
+          decorContainer.appendChild(gifSanta);
+
+          // Add decoration label
+          const decorLabel = document.createElement("div");
+          decorLabel.setAttribute("data-christmas-sidebar-gif", "label");
+          decorLabel.style.cssText = `
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            margin-top: 8px;
+            letter-spacing: 2px;
+          `;
+          decorLabel.innerHTML = "🎄 MERRY CHRISTMAS 🎅";
+
+          // Insert after the workspace selector
+          const workspaceSelect = sidebar.querySelector(".workspace-select");
+          if (workspaceSelect && workspaceSelect.parentElement) {
+            workspaceSelect.parentElement.insertBefore(decorContainer, workspaceSelect.nextSibling);
+            workspaceSelect.parentElement.insertBefore(decorLabel, decorContainer.nextSibling);
+          }
+        }
+      };
+
+      addSidebarDecorations();
+      setTimeout(addSidebarDecorations, 100);
+      setTimeout(addSidebarDecorations, 500);
+
+      // Add decorations to forms
+      const addFormDecorations = () => {
+        const modals = document.querySelectorAll(".modal");
+        modals.forEach((modal) => {
+          if (modal.querySelector("[data-christmas-form-decor]")) return; // Already decorated
+
+          const modalEl = modal as HTMLElement;
+          modalEl.style.borderTop = "6px solid #C41E3A";
+          modalEl.style.borderLeft = "6px solid #0B6623";
+          modalEl.style.borderRight = "6px solid #C41E3A";
+          modalEl.style.borderBottom = "6px solid #0B6623";
+          modalEl.style.borderRadius = "12px";
+          modalEl.style.background = "linear-gradient(135deg, #fff 0%, #f0f8f5 100%)";
+
+          const decorHeader = document.createElement("div");
+          decorHeader.setAttribute("data-christmas-form-decor", "true");
+          decorHeader.style.cssText = `
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 12px;
+            letter-spacing: 12px;
+          `;
+          decorHeader.innerHTML = "🎄 🎅 🎄";
+          modal.insertBefore(decorHeader, modal.firstChild);
+        });
+      };
+
+      addFormDecorations();
+      const modalObserver = setInterval(addFormDecorations, 500);
+
+      return () => {
+        clearInterval(modalObserver);
+      };
+    }
   }, []);
 
   useEffect(() => {

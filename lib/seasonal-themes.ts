@@ -6,9 +6,10 @@ export type SeasonalTheme = {
   background: string;
   text: string;
   decoration: string;
+  decorations?: string[];
 };
 
-export type Season = "christmas" | "easter" | "thanksgiving" | "halloween" | "nigerian-independence" | "default";
+export type Season = "christmas" | "easter" | "halloween" | "nigerian-independence" | "default";
 
 export const themes: Record<Season, SeasonalTheme> = {
   christmas: {
@@ -17,8 +18,9 @@ export const themes: Record<Season, SeasonalTheme> = {
     secondary: "#0B6623",
     accent: "#FFD700",
     background: "linear-gradient(135deg, #0B6623 0%, #C41E3A 100%)",
-    text: "#1f2933",
+    text: "#ffffff", // light text: dark text was unreadable on the green/red gradient
     decoration: "🎄",
+    decorations: ["🎄", "🎅", "🎁"],
   },
   easter: {
     name: "Easter",
@@ -29,21 +31,13 @@ export const themes: Record<Season, SeasonalTheme> = {
     text: "#1f2933",
     decoration: "🐰",
   },
-  thanksgiving: {
-    name: "Thanksgiving",
-    primary: "#D2691E",
-    secondary: "#FF8C00",
-    accent: "#DAA520",
-    background: "linear-gradient(135deg, #8B4513 0%, #FF8C00 100%)",
-    text: "#ffffff",
-    decoration: "🦃",
-  },
   halloween: {
     name: "Halloween",
     primary: "#1a1a1a",
     secondary: "#FF6B35",
     accent: "#9D4EDD",
-    background: "linear-gradient(135deg, #1a1a1a 0%, #FF6B35 100%)",
+    // gradient ends in a darker burnt orange so white text stays readable
+    background: "linear-gradient(135deg, #1a1a1a 0%, #8a3a12 100%)",
     text: "#ffffff",
     decoration: "🎃",
   },
@@ -52,7 +46,9 @@ export const themes: Record<Season, SeasonalTheme> = {
     primary: "#007749",
     secondary: "#FFFFFF",
     accent: "#FF8C00",
-    background: "linear-gradient(90deg, #007749 33%, #FFFFFF 33%, #FFFFFF 66%, #007749 66%)",
+    // green / white / green, with a wide white centre so dark text is readable
+    background:
+      "linear-gradient(90deg, #007749 0%, #007749 15%, #FFFFFF 15%, #FFFFFF 85%, #007749 85%, #007749 100%)",
     text: "#1f2933",
     decoration: "🇳🇬",
   },
@@ -67,39 +63,88 @@ export const themes: Record<Season, SeasonalTheme> = {
   },
 };
 
-export function getCurrentSeason(): Season {
-  const today = new Date();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
+/* ------------------------------------------------------------------ */
+/* Date helpers                                                        */
+/* ------------------------------------------------------------------ */
 
-  // Christmas: Dec 1 - Dec 31
-  if (month === 12) return "christmas";
+const DAY_MS = 86_400_000;
 
-  // Easter: March 22 - April 25 (approximate)
-  if ((month === 3 && day >= 22) || (month === 4 && day <= 25)) return "easter";
+/** Gregorian Easter Sunday (anonymous Gregorian algorithm). */
+export function easterSunday(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = March, 4 = April
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
 
-  // Thanksgiving: November (US - 4th Thursday, but we'll do whole month for simplicity)
-  if (month === 11) return "thanksgiving";
+/** Midnight (local) of the given date, so comparisons are by calendar day. */
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
 
-  // Halloween: Oct 25 - Oct 31
-  if (month === 10 && day >= 25) return "halloween";
+/** True if `today` is within [holiday - daysBefore, holiday + daysAfter]. */
+function inWindow(today: Date, holiday: Date, daysBefore: number, daysAfter = 0): boolean {
+  const t = startOfDay(today);
+  const h = startOfDay(holiday);
+  return t >= h - daysBefore * DAY_MS && t <= h + daysAfter * DAY_MS;
+}
 
-  // Nigerian Independence Day: October 1-7
-  if (month === 10 && day >= 1 && day <= 7) return "nigerian-independence";
+/* ------------------------------------------------------------------ */
+/* Season selection                                                    */
+/* ------------------------------------------------------------------ */
 
+type HolidayRule = {
+  season: Exclude<Season, "default">;
+  date: (year: number) => Date;
+  daysBefore: number;
+  daysAfter: number;
+};
+
+// Order matters if windows ever overlap: the first match wins.
+const holidayRules: HolidayRule[] = [
+  { season: "christmas", date: (y) => new Date(y, 11, 25), daysBefore: 24, daysAfter: 6 }, // Dec 1 to Dec 31
+  { season: "easter", date: easterSunday, daysBefore: 15, daysAfter: 1 },
+  { season: "halloween", date: (y) => new Date(y, 9, 31), daysBefore: 7, daysAfter: 0 },
+  { season: "nigerian-independence", date: (y) => new Date(y, 9, 1), daysBefore: 7, daysAfter: 0 },
+];
+
+/**
+ * Pick the season for a given date. Pass a date explicitly to test or to
+ * keep server and client in agreement; defaults to now.
+ */
+export function getCurrentSeason(today: Date = new Date()): Season {
+  const year = today.getFullYear();
+  for (const rule of holidayRules) {
+    if (inWindow(today, rule.date(year), rule.daysBefore, rule.daysAfter)) {
+      return rule.season;
+    }
+  }
   return "default";
 }
 
-export function getTheme(season?: Season): SeasonalTheme {
-  const currentSeason = season || getCurrentSeason();
-  return themes[currentSeason];
+export function getTheme(season?: Season, today: Date = new Date()): SeasonalTheme {
+  return themes[season ?? getCurrentSeason(today)];
 }
 
-export function applyThemeToDocument(theme: SeasonalTheme) {
+/** Client-only: sets CSS variables on <html>. Call from useEffect, not during SSR. */
+export function applyThemeToDocument(theme: SeasonalTheme, season?: Season) {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.style.setProperty("--theme-primary", theme.primary);
   root.style.setProperty("--theme-secondary", theme.secondary);
   root.style.setProperty("--theme-accent", theme.accent);
-  root.style.setProperty("--theme-background", theme.background);
+  root.style.setProperty("--theme-background", theme.background); // use with `background:`, not `background-color:`
   root.style.setProperty("--theme-text", theme.text);
+  if (season) root.setAttribute("data-season", season);
 }
