@@ -28,7 +28,7 @@
 }
 
 * { box-sizing: border-box; }
-body { min-width: 0; min-height: 100vh; margin: 0; overflow-x: clip; }
+body { min-width: 0; min-height: 100vh; margin: 0; overflow-x: clip; background: var(--canvas) url("/snowing.gif") center / cover no-repeat fixed; }
 button, input, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #aebdce; outline-offset: 2px; }
@@ -288,7 +288,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .auth-copy { margin: 7px 0 23px; color: #858791; font-size: 11px; }
 .auth-card .guest-form { gap: 13px; }
 .auth-card .full-button { margin-top: 3px; }
-.checkin-screen { position: relative; flex-direction: column; min-height: 100svh; padding: 76px 18px 55px; background: radial-gradient(ellipse at 50% 0%, #e9edf2 0%, #f6f7f9 54%); }
+.checkin-screen { position: relative; flex-direction: column; min-height: 100svh; padding: 76px 18px 55px; background: transparent; }
 .checkin-top-brand { position: absolute; top: 27px; display: flex; align-items: center; }
 .checkin-logo { display: block; width: 200px; height: auto; }
 .checkin-top-brand .brand-mark { width: 31px; height: 31px; flex-basis: 31px; font-size: 20px; }

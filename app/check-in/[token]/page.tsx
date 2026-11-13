@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
+import ChristmasDecor from "../../components/ChristmasDecor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -144,7 +145,8 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
   }
 
   return (
-    <main className="checkin-screen">
+    <main className="checkin-screen festive">
+      <ChristmasDecor />
       <div className="checkin-top-brand"><Image className="checkin-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={200} height={63} priority /></div>
       <section className="checkin-card">
         <div className={`checkin-symbol ${receipt ? "success" : ""}`}><span>{receipt ? "✓" : "✳"}</span></div>

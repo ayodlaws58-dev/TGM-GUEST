@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import ChristmasDecor from "../../../components/ChristmasDecor";
 import { useRouter } from "next/navigation";
 import { checkoutVisit, getVisitStatus, type VisitStatus } from "../../../../lib/guests";
 
@@ -105,7 +106,8 @@ export default function VisitPage({ params }: { params: Promise<{ token: string 
   const showReminder = !done && hours >= 1 && dismissedHour < hours;
 
   return (
-    <main className="checkin-screen">
+    <main className="checkin-screen festive">
+      <ChristmasDecor />
       <div className="checkin-top-brand"><Image className="checkin-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={200} height={63} priority /></div>
       <section className="checkin-card">
         {loading ? (
