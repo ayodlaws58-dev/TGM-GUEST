@@ -9,6 +9,7 @@ import {
   addEmployeeHostsBulk,
   addGuest,
   approveDemoGuest,
+  HOST_RESPONSE_LABELS,
   approveHostMessage,
   getReceptionWorkspace,
   getPendingHostMessages,
@@ -1081,7 +1082,9 @@ function GuestTable({
             : guests.length === 0 ? <tr><td colSpan={7} className="table-message"><div className="empty-state"><span className="empty-icon"><Icon name="users" size={21} /></span><strong>No visitors found</strong><span>Try another search or add a visitor to today&apos;s log.</span><button className="primary-button" onClick={onAdd}><Icon name="plus" size={16} /> Add visitor</button></div></td></tr>
               : guests.map((guest, index) => <tr key={guest.id}>
                 <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong>{guest.email && <small>{guest.email}</small>}{guest.phone && <small>{guest.phone}</small>}</span></div></td>
-                <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span>{guest.status === "checked_in" && guest.host_notified_at && <small className="notification-sent">Host notified</small>}</td>
+                <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span>{guest.status === "checked_in" && guest.host_notified_at && (guest.host_response
+                  ? <><span className={`host-response-pill ${guest.host_response}`} title={guest.host_response_at ? `Answered ${formatTime(guest.host_response_at)}` : undefined}>{HOST_RESPONSE_LABELS[guest.host_response]}</span>{guest.host_response_note && <small className="host-response-note-cell" title={guest.host_response_note}>“{guest.host_response_note}”</small>}</>
+                  : <span className="host-response-pill awaiting">Host notified · awaiting reply</span>)}</td>
                 <td className="arrival-cell">{formatTime(guest.checked_in_at)}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td><td className="company-cell" title={guest.purpose}>{guest.purpose}</td>
                 <td><div className="row-actions">
                   {guest.status === "pending_approval" && <button className="approve-action" disabled={approvingId === guest.id} onClick={() => onApprove(guest)}>{approvingId === guest.id ? "Sending…" : "Approve & notify"}</button>}

@@ -20,7 +20,18 @@ export type Guest = {
   checked_out_at: string | null;
   checkout_method?: CheckoutMethod | null;
   host_notified_at: string | null;
+  host_response?: HostResponse | null;
+  host_response_note?: string | null;
+  host_response_at?: string | null;
   created_at: string;
+};
+
+export type HostResponse = "coming" | "delayed" | "unavailable";
+
+export const HOST_RESPONSE_LABELS: Record<HostResponse, string> = {
+  coming: "Coming now",
+  delayed: "Needs a few minutes",
+  unavailable: "Can't meet",
 };
 
 export type NewGuest = {
@@ -73,7 +84,10 @@ const demoGuests: Guest[] = [
     status: "checked_in",
     checked_in_at: minutesAgo(52),
     checked_out_at: null,
-    host_notified_at: null,
+    host_notified_at: minutesAgo(51),
+    host_response: "coming",
+    host_response_note: null,
+    host_response_at: minutesAgo(50),
     created_at: minutesAgo(52),
   },
   {
@@ -88,7 +102,10 @@ const demoGuests: Guest[] = [
     status: "checked_in",
     checked_in_at: minutesAgo(39),
     checked_out_at: null,
-    host_notified_at: null,
+    host_notified_at: minutesAgo(38),
+    host_response: "delayed",
+    host_response_note: "In a call, down in 10 minutes",
+    host_response_at: minutesAgo(37),
     created_at: minutesAgo(39),
   },
   {
@@ -186,7 +203,7 @@ export async function listGuests(period: VisitorReportPeriod = "daily"): Promise
 
   const { data, error } = await client
     .from("guests")
-    .select("id, name, email, phone, company, host_name, host_id, purpose, status,     checked_in_at, checked_out_at, checkout_method, host_notified_at, created_at")
+    .select("id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, checkout_method, host_notified_at, host_response, host_response_note, host_response_at, created_at")
     .gte("created_at", start)
     .lt("created_at", end)
     .order("created_at", { ascending: false });
@@ -211,7 +228,7 @@ export async function listGuestsInRange(start: string, end: string): Promise<Gue
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await client
       .from("guests")
-      .select("id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, checkout_method, host_notified_at, created_at")
+      .select("id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, checkout_method, host_notified_at, host_response, host_response_note, host_response_at, created_at")
       .gte("created_at", start)
       .lt("created_at", end)
       .order("created_at", { ascending: true })
@@ -595,6 +612,36 @@ export async function listGuestsByWorkspace(workspaceOwnerId: string): Promise<G
   const { data, error } = await client.rpc("list_guests_by_workspace", { workspace_owner_id: workspaceOwnerId });
   if (error) throw error;
   return (data ?? []) as Guest[];
+}
+
+export type HostResponseVisit = {
+  visitor_name: string;
+  visitor_company: string;
+  purpose: string;
+  host_name: string;
+  company_name: string;
+  status: GuestStatus;
+  checked_in_at: string | null;
+  host_response: HostResponse | null;
+  host_response_note: string | null;
+  host_response_at: string | null;
+};
+
+// Public: the host opens this from the link in their arrival email. The token is the capability.
+export async function getHostResponseVisit(responseToken: string): Promise<HostResponseVisit | null> {
+  const client = getSupabase();
+  if (!client) throw new Error("Host responses need Supabase. They are not available in demo mode.");
+  const { data, error } = await client.rpc("get_host_response_visit", { response_token: responseToken });
+  if (error) throw error;
+  return (data?.[0] as HostResponseVisit | undefined) ?? null;
+}
+
+export async function submitHostResponse(responseToken: string, response: HostResponse, note: string): Promise<Pick<HostResponseVisit, "host_response" | "host_response_note" | "host_response_at">> {
+  const client = getSupabase();
+  if (!client) throw new Error("Host responses need Supabase. They are not available in demo mode.");
+  const { data, error } = await client.rpc("submit_host_response", { response_token: responseToken, response, note });
+  if (error) throw error;
+  return data?.[0];
 }
 
 export async function getPendingHostMessages(): Promise<HostMessage[]> {
