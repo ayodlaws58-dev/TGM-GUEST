@@ -1,4 +1,4 @@
-// Professional visitor arrival email template with interactive response buttons
+// Visitor arrival email for the host, with links to tell reception whether they can meet
 
 export type HostCheckInEmailData = {
   hostName: string;
@@ -33,6 +33,21 @@ export function renderHostCheckInEmail(data: HostCheckInEmailData) {
   const location = esc(data.receptionLocation?.trim() || "Reception");
   const brand = esc(data.companyName?.trim() || "Reception");
   const address = esc(data.companyAddress?.trim() || "");
+
+  const button = (url: string, label: string, primary: boolean) =>
+    `<a href="${esc(url)}" style="display:block;padding:12px 10px;background-color:${primary ? "#000000" : "#ffffff"};color:${primary ? "#ffffff" : "#000000"};border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;">${label}</a>`;
+  const hasResponseLinks = Boolean(data.responseYesUrl && data.responseMaybeUrl && data.responseNoUrl);
+  const responseBlock = hasResponseLinks
+    ? `<p style="margin:0 0 12px;font-size:16px;line-height:1.5;"><strong>Can you meet them? Let reception know with one tap:</strong></p>
+          <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 20px;">
+            <tr>
+              <td style="padding:0 6px 0 0;width:33%;">${button(data.responseYesUrl!, "Yes, coming now", true)}</td>
+              <td style="padding:0 3px;width:34%;">${button(data.responseMaybeUrl!, "Need a few minutes", false)}</td>
+              <td style="padding:0 0 0 6px;width:33%;">${button(data.responseNoUrl!, "I can't meet", false)}</td>
+            </tr>
+          </table>
+          <p style="margin:0 0 20px;font-size:13px;line-height:1.5;color:#666666;">You can change your answer from the same links while your visitor is on site.</p>`
+    : `<p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#666666;">If you are unable to meet them, please let the reception team know.</p>`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -92,23 +107,7 @@ export function renderHostCheckInEmail(data: HostCheckInEmailData) {
             </td></tr>
           </table>
 
-          <p style="margin:0 0 20px;font-size:16px;line-height:1.5;"><strong>Can you meet them now? Let reception know with one tap:</strong></p>
-
-          <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin:20px 0;">
-            <tr>
-              <td style="padding:0 8px 0 0;width:33%;">
-                <a href="#" style="display:inline-block;width:100%;padding:12px 16px;background-color:#000000;color:#ffffff;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;cursor:pointer;" onclick="return false;">Yes, I can meet</a>
-              </td>
-              <td style="padding:0 4px;width:33%;">
-                <a href="#" style="display:inline-block;width:100%;padding:12px 16px;background-color:#ffffff;color:#000000;border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;cursor:pointer;" onclick="return false;">Maybe, running late</a>
-              </td>
-              <td style="padding:0 0 0 4px;width:33%;">
-                <a href="#" style="display:inline-block;width:100%;padding:12px 16px;background-color:#ffffff;color:#000000;border:1px solid #000000;border-radius:4px;font-weight:500;font-size:14px;text-align:center;text-decoration:none;box-sizing:border-box;cursor:pointer;" onclick="return false;">No, I can't</a>
-              </td>
-            </tr>
-          </table>
-
-          <p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#666666;">If you are unable to meet them, please let the reception team know.</p>
+${responseBlock}
 
           <hr class="divider" style="border:none;border-top:2px solid #eaeaea;margin:24px 0;"/>
 
@@ -135,10 +134,10 @@ export function renderHostCheckInEmail(data: HostCheckInEmailData) {
     `Checked in: ${data.checkInTime}`,
     `Location:   ${data.receptionLocation?.trim() || "Reception"}`,
     "",
-    "Can you meet them now?",
-    data.responseYesUrl ? `Yes: ${data.responseYesUrl}` : "",
-    data.responseMaybeUrl ? `Maybe: ${data.responseMaybeUrl}` : "",
-    data.responseNoUrl ? `No: ${data.responseNoUrl}` : "",
+    "Can you meet them? Let reception know:",
+    data.responseYesUrl ? `Yes, coming now: ${data.responseYesUrl}` : "",
+    data.responseMaybeUrl ? `Need a few minutes: ${data.responseMaybeUrl}` : "",
+    data.responseNoUrl ? `I can't meet: ${data.responseNoUrl}` : "",
     "",
     "If you are unable to meet them, please let the reception team know.",
     "",

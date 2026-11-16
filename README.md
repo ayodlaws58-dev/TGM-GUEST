@@ -54,6 +54,7 @@ Company administrators can invite reception staff under **Settings → Reception
 - Reusable company reception QR code and mobile visitor request form.
 - Visitor first and last name, optional middle name, phone number, email, company, employee host, and visit purpose.
 - Admin approval queue, host email notifications, visitor log, status filters, and manual check-in/check-out.
+- Host availability replies: the arrival email lets the employee answer "Coming now", "Need a few minutes" or "Can't meet" (with an optional note). Reception sees the answer live in the visitor log. Apply `20261116090000_add_host_meeting_response.sql` first.
 - Visitor self-checkout from the reception QR page using an emailed one-time verification code.
 - Employee directory with host names and work email addresses.
 - Daily, weekly (Sunday–Saturday), and monthly reports calculated from stored visitor records, filterable by visit purpose.

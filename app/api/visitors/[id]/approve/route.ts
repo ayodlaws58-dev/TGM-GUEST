@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { renderHostCheckInEmail } from "../../../../../lib/host-checkin-email";
 
 type VisitorDetails = {
   id: string;
@@ -15,6 +16,7 @@ type VisitorDetails = {
   status: string;
   checked_in_at: string | null;
   host_notified_at: string | null;
+  host_response_token: string;
 };
 
 function jsonError(message: string, status: number) {
@@ -43,7 +45,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const { data, error: visitorError } = await client
     .from("guests")
-    .select("id, owner_id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, host_notified_at")
+    .select("id, owner_id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, host_notified_at, host_response_token")
     .eq("id", id)
     .single();
   if (visitorError || !data) return jsonError("Visitor not found in this workspace.", 404);
@@ -114,20 +116,36 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     // cc_emails field might not exist yet, continue without it
   }
 
+  // Links let the host tell reception whether they can meet. Each opens a confirmation page
+  // (not a one-click GET write), so email link scanners cannot answer on the host's behalf.
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(/\/+$/, "");
+  const responseUrl = (answer: "coming" | "delayed" | "unavailable") =>
+    `${siteUrl}/host-response/${encodeURIComponent(visitor.host_response_token)}?answer=${answer}`;
+  const arrivalTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", dateStyle: "medium", timeStyle: "short" }).format(new Date());
+  const companyName = companyResult.data.company_name;
+  const email = renderHostCheckInEmail({
+    hostName: host.name,
+    visitorName: visitor.name,
+    visitorCompany: visitor.company,
+    purpose: visitor.purpose,
+    checkInTime: arrivalTime,
+    companyName,
+    responseYesUrl: responseUrl("coming"),
+    responseMaybeUrl: responseUrl("delayed"),
+    responseNoUrl: responseUrl("unavailable"),
+  });
+
   const resend = new Resend(resendApiKey);
   const emailPayload: any = {
     from: resendFromEmail,
     to: [host.email],
-    subject: `${visitor.name} has arrived at ${companyResult.data.company_name}`,
+    subject: `${visitor.name} has arrived at ${companyName}`,
+    html: email.html,
     text: [
-      `Hello ${host.name},`,
+      email.text,
       "",
-      `${visitor.name} has been approved by reception and is checked in to visit you.`,
       `Visitor email: ${visitor.email || "Not provided"}`,
       `Visitor phone: ${visitor.phone || "Not provided"}`,
-      `Company: ${visitor.company || "Not provided"}`,
-      `Purpose: ${visitor.purpose}`,
-      `Arrival time: ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`,
     ].join("\n"),
   };
 
