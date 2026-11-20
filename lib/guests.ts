@@ -596,7 +596,15 @@ export async function getReceptionCompanyName(receptionToken: string): Promise<s
   return workspace.reception_token === receptionToken ? workspace.company_name : null;
 }
 
-export type Workspace = { id: string; owner_id: string; company_name: string; reception_token: string; created_at: string };
+export type Workspace = {
+  id: string;
+  owner_id: string;
+  company_name: string;
+  reception_token: string;
+  created_at: string;
+  cc_emails?: string[] | null;
+  visitor_count?: number | null;
+};
 
 export async function listAllWorkspaces(): Promise<Workspace[]> {
   const client = getSupabase();
@@ -604,6 +612,23 @@ export async function listAllWorkspaces(): Promise<Workspace[]> {
   const { data, error } = await client.rpc("list_all_workspaces");
   if (error) throw error;
   return (data ?? []) as Workspace[];
+}
+
+// Developers and super admins only (enforced in the database function).
+export async function adminUpdateWorkspace(ownerId: string, companyName: string, ccEmails: string[]): Promise<Pick<Workspace, "id" | "owner_id" | "company_name" | "cc_emails">> {
+  const client = getSupabase();
+  if (!client) throw new Error("Editing companies requires a connected workspace.");
+  const { data, error } = await client.rpc("admin_update_workspace", { p_owner_id: ownerId, p_company_name: companyName, p_cc_emails: ccEmails });
+  if (error) throw error;
+  return data?.[0];
+}
+
+// Developers and super admins only. Deletes the company and all of its visitors, hosts and team.
+export async function adminDeleteWorkspace(ownerId: string): Promise<void> {
+  const client = getSupabase();
+  if (!client) throw new Error("Removing companies requires a connected workspace.");
+  const { error } = await client.rpc("admin_delete_workspace", { p_owner_id: ownerId });
+  if (error) throw error;
 }
 
 export async function listGuestsByWorkspace(workspaceOwnerId: string): Promise<Guest[]> {

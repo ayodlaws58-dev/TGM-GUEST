@@ -8,6 +8,8 @@ import {
   addEmployeeHost,
   addEmployeeHostsBulk,
   addGuest,
+  adminDeleteWorkspace,
+  adminUpdateWorkspace,
   approveDemoGuest,
   HOST_RESPONSE_LABELS,
   approveHostMessage,
@@ -38,6 +40,7 @@ import {
 } from "../lib/guests";
 import HostSearch from "./components/HostSearch";
 import PastReports from "./components/PastReports";
+import { ColumnChart, DonutChart, RankedBars, ShareLegend, type DonutSegment } from "./components/Charts";
 import { getTheme, applyThemeToDocument, getCurrentSeason } from "../lib/seasonal-themes";
 
 type IconName = "grid" | "users" | "chart" | "settings" | "search" | "plus" | "arrow" | "check" | "clock" | "close" | "download" | "logout" | "qr";
@@ -560,6 +563,42 @@ export default function Home() {
     assistedCheckedOut: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_out" && guest.checkout_method !== "self").length,
   }), [purposeFilteredReportGuests]);
 
+  const presenceSegments: DonutSegment[] = [
+    { key: "on-site", label: "On site", value: stats.onSite, className: "legend-checked" },
+    { key: "checked-out", label: "Checked out", value: stats.checkedOut, className: "legend-checked-out" },
+  ];
+
+  // Visits over the report period: by hour for a day, by day for a week or month.
+  const reportTimeline = useMemo(() => {
+    const visits = purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out");
+    const when = (guest: Guest) => new Date(guest.checked_in_at ?? guest.created_at);
+    const today = new Date();
+    if (reportPeriod === "daily") {
+      const hours = visits.map((guest) => when(guest).getHours());
+      const startHour = Math.min(8, ...hours);
+      const endHour = Math.max(17, ...hours);
+      const hourLabel = new Intl.DateTimeFormat("en", { hour: "numeric" });
+      return Array.from({ length: endHour - startHour + 1 }, (_, index) => {
+        const hour = startHour + index;
+        const label = hourLabel.format(new Date(2020, 0, 1, hour));
+        return { key: hour, label: label.replace(/\s/g, "").toLowerCase(), detail: `${label} – ${hourLabel.format(new Date(2020, 0, 1, hour + 1))}`, value: hours.filter((h) => h === hour).length };
+      });
+    }
+    const start = reportPeriod === "weekly"
+      ? new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay())
+      : new Date(today.getFullYear(), today.getMonth(), 1);
+    const days = reportPeriod === "weekly" ? 7 : new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    const counts = new Map<string, number>();
+    visits.forEach((guest) => counts.set(dayKey(when(guest)), (counts.get(dayKey(when(guest))) ?? 0) + 1));
+    const weekday = new Intl.DateTimeFormat("en", { weekday: "short" });
+    const fullDay = new Intl.DateTimeFormat("en", { weekday: "long", month: "short", day: "numeric" });
+    return Array.from({ length: days }, (_, index) => {
+      const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
+      return { key: index, label: reportPeriod === "weekly" ? weekday.format(date) : String(date.getDate()), detail: fullDay.format(date), value: counts.get(dayKey(date)) ?? 0 };
+    });
+  }, [purposeFilteredReportGuests, reportPeriod]);
+
   const filteredGuests = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return guests.filter((guest) => {
@@ -571,22 +610,30 @@ export default function Home() {
   }, [filter, guests, query]);
 
   const arrivalHours = useMemo(() => {
-    const startHour = 8;
-    return Array.from({ length: 10 }, (_, index) => {
+    const arrivalHourList = guests
+      .filter((guest) => guest.checked_in_at !== null)
+      .map((guest) => new Date(guest.checked_in_at as string).getHours());
+    // Office hours by default, widened if anyone arrived earlier or later.
+    const startHour = Math.min(8, ...arrivalHourList);
+    const endHour = Math.max(17, ...arrivalHourList);
+    const hourLabel = new Intl.DateTimeFormat("en", { hour: "numeric" });
+    return Array.from({ length: endHour - startHour + 1 }, (_, index) => {
       const hour = startHour + index;
+      const label = hourLabel.format(new Date(2020, 0, 1, hour));
       return {
-        hour,
-        label: new Intl.DateTimeFormat("en", { hour: "numeric" }).format(new Date(2020, 0, 1, hour)),
-        count: guests.filter((guest) => guest.checked_in_at !== null && new Date(guest.checked_in_at).getHours() === hour).length,
+        key: hour,
+        label: label.replace(/\s/g, "").toLowerCase(),
+        detail: `${label} – ${hourLabel.format(new Date(2020, 0, 1, hour + 1))}`,
+        value: arrivalHourList.filter((arrivalHour) => arrivalHour === hour).length,
       };
     });
   }, [guests]);
-  const maxArrivals = Math.max(3, ...arrivalHours.map((item) => item.count));
+  const peakArrival = arrivalHours.reduce<(typeof arrivalHours)[number] | null>((peak, item) => item.value > (peak?.value ?? 0) ? item : peak, null);
   const hostCounts = useMemo(() => {
     const counts = new Map<string, number>();
     purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out")
       .forEach((guest) => counts.set(guest.host_name, (counts.get(guest.host_name) ?? 0) + 1));
-    return [...counts.entries()].sort((first, second) => second[1] - first[1]).slice(0, 5);
+    return [...counts.entries()].sort((first, second) => second[1] - first[1]).slice(0, 8);
   }, [purposeFilteredReportGuests]);
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
@@ -964,11 +1011,11 @@ export default function Home() {
             </section>
             <section className="dashboard-grid">
               <div className="panel arrivals-panel">
-                <div className="panel-heading"><div><h2>Today&apos;s arrivals</h2><p>Visitor check-ins by hour</p></div><span className="chart-legend"><i /> Visitors</span></div>
-                <div className="chart-wrap"><div className="chart-y-labels"><span>{maxArrivals}</span><span>{Math.round(maxArrivals * .75)}</span><span>{Math.round(maxArrivals * .5)}</span><span>{Math.round(maxArrivals * .25)}</span><span>0</span></div><div className="chart"><div className="chart-grid"><i /><i /><i /><i /><i /></div><div className="chart-bars">{arrivalHours.map((item) => <div key={item.hour} className={`chart-bar ${item.count > 0 ? "highlight" : ""}`} style={{ height: `${Math.max(item.count ? item.count / maxArrivals * 100 : 2, 2)}%` }} title={`${item.count} visitor${item.count === 1 ? "" : "s"} at ${item.label}`} />)}</div><div className="chart-x-labels">{arrivalHours.filter((item) => item.hour % 2 === 0).map((item) => <span key={item.hour}>{item.label}</span>)}</div></div></div>
-                <div className="chart-foot"><span><i className="chart-foot-dot" /> Today&apos;s check-ins</span><strong>{stats.total} visitor{stats.total === 1 ? "" : "s"}</strong></div>
+                <div className="panel-heading"><div><h2>Today&apos;s arrivals</h2><p>Visitor check-ins by hour</p></div></div>
+                <ColumnChart data={arrivalHours} ariaLabel="Visitor check-ins by hour today" />
+                <div className="chart-foot"><span>{peakArrival ? <>Busiest hour <strong>{peakArrival.detail}</strong></> : "No check-ins yet today"}</span><strong>{stats.total} visitor{stats.total === 1 ? "" : "s"}</strong></div>
               </div>
-              <div className="panel checkin-panel"><div className="panel-heading"><div><h2>Who&apos;s in the office</h2><p>Live visitor status</p></div><span className="live-small"><i /> {hasSupabaseConfig ? realtimeConnected ? "Live" : "Connecting" : "Demo"}</span></div><div className="donut-wrap"><div className="donut" style={{ "--progress": `${stats.total ? stats.onSite / stats.total * 100 : 0}%` } as React.CSSProperties}><div className="donut-center"><strong>{stats.onSite}</strong><span>on site now</span></div></div></div><div className="status-legend"><div><span className="legend-name"><i className="legend-checked" />On site</span><strong>{stats.onSite}</strong></div><div><span className="legend-name"><i className="legend-checked-out" />Checked out</span><strong>{stats.checkedOut}</strong></div></div></div>
+              <div className="panel checkin-panel"><div className="panel-heading"><div><h2>Who&apos;s in the office</h2><p>Live visitor status</p></div><span className="live-small"><i /> {hasSupabaseConfig ? realtimeConnected ? "Live" : "Connecting" : "Demo"}</span></div><div className="donut-wrap"><DonutChart segments={presenceSegments} centerValue={stats.onSite} centerLabel="on site now" /></div><ShareLegend segments={presenceSegments} /></div>
             </section>
             <GuestTable guests={filteredGuests.slice(0, 5)} loading={loading} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} onAdd={() => setShowAdd(true)} onStatus={changeStatus} onApprove={approveVisitor} approvingId={approvingId} canNotifyHost={hasSupabaseConfig} onSeeAll={() => setPage("Visitors")} />
           </>}
@@ -998,6 +1045,10 @@ export default function Home() {
               <StatCard label="Assisted check-out" value={reportStats.assistedCheckedOut} caption="Checked out by reception staff" icon="users" color="lavender" trend="Assisted" />
               <StatCard label="All check-outs" value={reportStats.checkedOut} caption="Self plus assisted" icon="clock" color="peach" trend="Total" />
             </section>
+            <section className="report-charts">
+              <section className="panel analytics-table timeline-panel"><div className="panel-heading"><div><h2>{reportPeriod === "daily" ? "Visits by hour" : "Visits by day"}</h2><p>{formatReportRange(reportPeriod)}</p></div><strong className="panel-figure">{reportStats.total}<small> visit{reportStats.total === 1 ? "" : "s"}</small></strong></div><ColumnChart data={reportTimeline} unit="visit" ariaLabel={reportPeriod === "daily" ? "Visits by hour" : "Visits by day"} /></section>
+              <section className="panel analytics-table host-panel"><div className="panel-heading"><div><h2>Visits by host</h2><p>Top hosts by approved visits</p></div></div><div className="analytics-bars">{hostCounts.length ? <RankedBars rows={hostCounts} total={reportStats.total} /> : <p className="settings-heading">No visitor activity recorded in this period.</p>}</div></section>
+            </section>
             <section className="panel guest-panel daily-report-table">
               <div className="guest-panel-heading"><div><div className="title-with-count"><h2>{reportPeriod === "daily" ? "Daily visitors" : reportPeriod === "weekly" ? "Weekly visitors" : "Monthly visitors"}</h2><span className="table-count">{purposeFilteredReportGuests.length}</span></div><p>{reportPurpose === "all" ? `All visitor requests for this ${reportPeriod === "daily" ? "day" : reportPeriod === "weekly" ? "week" : "month"}` : `${reportPurpose} visits for this ${reportPeriod === "daily" ? "day" : reportPeriod === "weekly" ? "week" : "month"}`}</p></div></div>
               <div className="table-scroll"><table>
@@ -1015,7 +1066,6 @@ export default function Home() {
               </table></div>
               <div className="table-footer"><span>Showing <strong>{purposeFilteredReportGuests.length}</strong> visitor{purposeFilteredReportGuests.length === 1 ? "" : "s"}</span><span>{formatReportRange(reportPeriod)}</span></div>
             </section>
-            <section className="panel analytics-table"><div className="panel-heading"><div><h2>Visits by host</h2><p>Employees welcoming visitors in this period</p></div></div><div className="analytics-bars">{hostCounts.length ? hostCounts.map(([host, count]) => <div className="analytics-row" key={host}><span>{host}</span><div className="analytics-track"><i style={{ width: `${reportStats.total ? count / reportStats.total * 100 : 0}%`, background: "#5968de" }} /></div><strong>{count}</strong></div>) : <p className="settings-heading">No visitor activity recorded in this period.</p>}</div></section>
           </>}
 
           {page === "Past reports" && <PastReports />}
@@ -1281,14 +1331,35 @@ function CcEmailManager() {
   </section>;
 }
 
+const historyDateFormat = new Intl.DateTimeFormat("en", { year: "numeric", month: "short", day: "numeric" });
+const historyTimeFormat = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" });
+
+function formatHistoryDateTime(value: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return `${historyDateFormat.format(date)}, ${historyTimeFormat.format(date)}`;
+}
+
 function SuperAdminDashboard() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [workspaceGuests, setWorkspaceGuests] = useState<Guest[]>([]);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyStatus, setHistoryStatus] = useState<GuestStatus | "all">("all");
+  const [editing, setEditing] = useState<Workspace | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCc, setEditCc] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [removing, setRemoving] = useState<Workspace | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState("");
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -1303,6 +1374,8 @@ function SuperAdminDashboard() {
   }, []);
 
   useEffect(() => {
+    setHistoryQuery("");
+    setHistoryStatus("all");
     if (!selectedWorkspace) {
       setWorkspaceGuests([]);
       return;
@@ -1323,11 +1396,75 @@ function SuperAdminDashboard() {
     total: workspaceGuests.length,
     checkedIn: workspaceGuests.filter((g) => g.status === "checked_in").length,
     checkedOut: workspaceGuests.filter((g) => g.status === "checked_out").length,
-    pending: workspaceGuests.filter((g) => g.status === "pending_approval").length,
   };
 
+  const historyGuests = useMemo(() => {
+    const term = historyQuery.trim().toLowerCase();
+    return workspaceGuests.filter((guest) => {
+      if (historyStatus !== "all" && guest.status !== historyStatus) return false;
+      if (!term) return true;
+      return [guest.name, guest.email, guest.phone, guest.company, guest.host_name, guest.purpose]
+        .some((field) => field?.toLowerCase().includes(term));
+    });
+  }, [workspaceGuests, historyQuery, historyStatus]);
+
+  function openEdit(workspace: Workspace) {
+    setNotice("");
+    setEditing(workspace);
+    setEditName(workspace.company_name);
+    setEditCc((workspace.cc_emails ?? []).join(", "));
+    setEditError("");
+  }
+
+  async function handleEditSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    const name = editName.trim();
+    if (!name) { setEditError("Enter a company name."); return; }
+    const ccEmails = editCc.split(/[\s,;]+/).map((email) => email.trim()).filter(Boolean);
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const updated = await adminUpdateWorkspace(editing.owner_id, name, ccEmails);
+      setWorkspaces((current) => current.map((w) => w.owner_id === editing.owner_id
+        ? { ...w, company_name: updated?.company_name ?? name, cc_emails: updated?.cc_emails ?? ccEmails }
+        : w));
+      setNotice(`Saved changes to ${updated?.company_name ?? name}.`);
+      setEditing(null);
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : "Unable to save company.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function openRemove(workspace: Workspace) {
+    setNotice("");
+    setRemoving(workspace);
+    setRemoveConfirm("");
+    setRemoveError("");
+  }
+
+  async function handleRemove(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!removing || removeConfirm.trim() !== removing.company_name) return;
+    setRemoveBusy(true);
+    setRemoveError("");
+    try {
+      await adminDeleteWorkspace(removing.owner_id);
+      setWorkspaces((current) => current.filter((w) => w.owner_id !== removing.owner_id));
+      if (selectedWorkspace === removing.owner_id) setSelectedWorkspace(null);
+      setNotice(`Removed ${removing.company_name}.`);
+      setRemoving(null);
+    } catch (cause) {
+      setRemoveError(cause instanceof Error ? cause.message : "Unable to remove company.");
+    } finally {
+      setRemoveBusy(false);
+    }
+  }
+
   return <>
-    <section className="page-heading"><div><p className="eyebrow">SYSTEM ADMINISTRATION</p><h1>Company overview</h1><p className="heading-subtitle">Monitor visitor activity across all companies.</p></div></section>
+    <section className="page-heading"><div><p className="eyebrow">SYSTEM ADMINISTRATION</p><h1>Company overview</h1><p className="heading-subtitle">Monitor, edit and remove companies, and browse their full visitor history.</p></div></section>
     <section className="panel past-reports">
       <div className="past-reports-toolbar">
         <label htmlFor="company-select">Select a company</label>
@@ -1335,18 +1472,25 @@ function SuperAdminDashboard() {
           <option value="">All companies</option>
           {workspaces.map((workspace) => <option key={workspace.id} value={workspace.owner_id}>{workspace.company_name}</option>)}
         </select>
+        <span className="past-reports-hint">{workspaces.length} compan{workspaces.length === 1 ? "y" : "ies"}</span>
       </div>
       {error && <p className="form-error past-reports-error" role="alert">{error}</p>}
+      {notice && <p className="company-notice" role="status">{notice}</p>}
       {loading ? <p className="table-message"><span className="spinner" />Loading companies…</p>
         : workspaces.length === 0 ? <p className="table-message">No companies registered yet.</p>
-          : <ul className="day-list">
+          : <ul className="day-list company-list">
             {workspaces.map((workspace) => (
-              <li key={workspace.id} className={`day-row ${workspace.owner_id === selectedWorkspace ? "selected" : ""}`}>
+              <li key={workspace.id} className={`day-row company-row ${workspace.owner_id === selectedWorkspace ? "selected" : ""}`}>
                 <div className="day-date">
                   <strong>{workspace.company_name}</strong>
-                  <small>{new Intl.DateTimeFormat("en", { year: "numeric", month: "short", day: "numeric" }).format(new Date(workspace.created_at))}</small>
+                  <small>Joined {historyDateFormat.format(new Date(workspace.created_at))}</small>
                 </div>
-                <button type="button" className="secondary-button" onClick={() => setSelectedWorkspace(workspace.owner_id)}>View details</button>
+                <span className="day-stat"><strong>{workspace.visitor_count ?? "—"}</strong> visitor{workspace.visitor_count === 1 ? "" : "s"}</span>
+                <div className="day-actions">
+                  <button type="button" className="secondary-button" onClick={() => setSelectedWorkspace(workspace.owner_id)}>View history</button>
+                  <button type="button" className="secondary-button" onClick={() => openEdit(workspace)}>Edit</button>
+                  <button type="button" className="secondary-button danger-button" onClick={() => openRemove(workspace)}>Remove</button>
+                </div>
               </li>
             ))}
           </ul>}
@@ -1356,7 +1500,7 @@ function SuperAdminDashboard() {
         <div className="guest-panel-heading">
           <div>
             <div className="title-with-count"><h2>{selectedCompany.company_name}</h2></div>
-            <p>Visitor activity overview</p>
+            <p>Full visitor history</p>
           </div>
         </div>
         {workspaceLoading ? <p className="table-message"><span className="spinner" />Loading visitors…</p>
@@ -1365,25 +1509,54 @@ function SuperAdminDashboard() {
             <StatCard label="Checked in" value={stats.checkedIn} caption="Currently on site" icon="check" color="mint" trend="On site" />
             <StatCard label="Checked out" value={stats.checkedOut} caption="Completed visits" icon="clock" color="peach" trend="Completed" />
           </section>
-          <div className="table-scroll"><table>
-            <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th></tr></thead>
+          <div className="past-reports-toolbar history-toolbar">
+            <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search visitor history" placeholder="Search name, email, host…" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} /></label>
+            <select className="filter-select" aria-label="Filter by status" value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value as GuestStatus | "all")}>
+              <option value="all">All statuses</option>
+              {(Object.keys(statusLabels) as GuestStatus[]).map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+            </select>
+          </div>
+          <div className="table-scroll history-scroll"><table>
+            <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th><th>DEPARTURE</th></tr></thead>
             <tbody>
-              {workspaceGuests.length === 0 ? <tr><td colSpan={6} className="table-message">No visitors recorded for this company.</td></tr>
-                : workspaceGuests.slice(0, 10).map((guest) => <tr key={guest.id}>
-                  <td><strong>{guest.name}</strong>{guest.email && <small>{guest.email}</small>}</td>
+              {historyGuests.length === 0 ? <tr><td colSpan={7} className="table-message">{workspaceGuests.length === 0 ? "No visitors recorded for this company." : "No visitors match your search."}</td></tr>
+                : historyGuests.map((guest) => <tr key={guest.id}>
+                  <td><strong>{guest.name}</strong>{guest.email && <small>{guest.email}</small>}{guest.phone && <small>{guest.phone}</small>}</td>
                   <td>{guest.purpose}</td>
                   <td className="company-cell">{guest.host_name}</td>
                   <td className="company-cell">{guest.company || "—"}</td>
-                  <td><span className={`status-pill ${guest.status}`}><i /></span></td>
-                  <td>{guest.checked_in_at ? new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(guest.checked_in_at)) : "—"}</td>
+                  <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span></td>
+                  <td className="history-time">{formatHistoryDateTime(guest.checked_in_at ?? guest.created_at)}</td>
+                  <td className="history-time">{formatHistoryDateTime(guest.checked_out_at)}</td>
                 </tr>)}
             </tbody>
           </table></div>
-          {workspaceGuests.length > 10 && <div className="table-footer"><span>Showing 10 of {workspaceGuests.length} visitors</span></div>}
+          <div className="table-footer"><span>Showing <strong>{historyGuests.length}</strong> of {workspaceGuests.length} visitor{workspaceGuests.length === 1 ? "" : "s"}</span><span>Newest first</span></div>
           </>}
         {workspaceError && <p className="form-error past-reports-error" role="alert">{workspaceError}</p>}
       </section>
     )}
+    {editing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !editSaving) setEditing(null); }}>
+      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="edit-company-title">
+        <div className="modal-heading"><div><p className="eyebrow">EDIT COMPANY</p><h2 id="edit-company-title">{editing.company_name}</h2><p>Changes apply immediately for this company&apos;s admins and reception team.</p></div><button className="icon-button" aria-label="Close" onClick={() => setEditing(null)} disabled={editSaving}><Icon name="close" /></button></div>
+        <form className="guest-form" onSubmit={handleEditSave}>
+          <label>Company name<input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} required autoFocus /></label>
+          <label>CC emails<input value={editCc} onChange={(event) => setEditCc(event.target.value)} placeholder="ops@company.com, manager@company.com" /></label>
+          {editError && <p className="form-error" role="alert">{editError}</p>}
+          <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setEditing(null)} disabled={editSaving}>Cancel</button><button type="submit" className="primary-button" disabled={editSaving}>{editSaving ? "Saving…" : "Save changes"}</button></div>
+        </form>
+      </section>
+    </div>}
+    {removing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !removeBusy) setRemoving(null); }}>
+      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="remove-company-title">
+        <div className="modal-heading"><div><p className="eyebrow">REMOVE COMPANY</p><h2 id="remove-company-title">Remove {removing.company_name}?</h2><p>This permanently deletes the company, its {removing.visitor_count ?? ""} visitor record{removing.visitor_count === 1 ? "" : "s"}, hosts and reception team. It cannot be undone.</p></div><button className="icon-button" aria-label="Close" onClick={() => setRemoving(null)} disabled={removeBusy}><Icon name="close" /></button></div>
+        <form className="guest-form" onSubmit={handleRemove}>
+          <label><span>Type <strong>{removing.company_name}</strong> to confirm</span><input value={removeConfirm} onChange={(event) => setRemoveConfirm(event.target.value)} autoFocus /></label>
+          {removeError && <p className="form-error" role="alert">{removeError}</p>}
+          <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setRemoving(null)} disabled={removeBusy}>Cancel</button><button type="submit" className="primary-button danger-solid" disabled={removeBusy || removeConfirm.trim() !== removing.company_name}>{removeBusy ? "Removing…" : "Remove company"}</button></div>
+        </form>
+      </section>
+    </div>}
   </>;
 }
 
